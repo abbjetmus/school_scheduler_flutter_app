@@ -27,7 +27,7 @@ class AppRoot extends CompositionWidget {
 
   @override
   Widget Function(BuildContext) setup() {
-    final pb = PocketBase('https://skolpunkten.se');
+    final pb = PocketBase('https://school-scheduler-pb.cloud.mustini.com');
     final attendanceRepo = AttendanceRepository(pb);
     final authStore = app_auth.AuthStore(pb);
 
@@ -54,10 +54,7 @@ class AppRoot extends CompositionWidget {
     return (context) => MaterialApp.router(
       title: 'School Scheduler',
       routerConfig: router,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
+      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue), useMaterial3: true),
     );
   }
 }
