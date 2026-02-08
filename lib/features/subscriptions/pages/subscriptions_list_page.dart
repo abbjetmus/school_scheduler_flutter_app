@@ -6,6 +6,8 @@ import '../../../core/di/injection_keys.dart';
 class SubscriptionsListPage extends CompositionWidget {
   const SubscriptionsListPage({super.key});
 
+  static const String path = '/subscriptions';
+
   @override
   Widget Function(BuildContext) setup() {
     final subscriptionsStore = inject(subscriptionsStoreKey);

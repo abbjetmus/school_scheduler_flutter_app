@@ -9,6 +9,8 @@ import 'components/haldor_event_details_dialog.dart';
 class HaldorCalendarPage extends CompositionWidget {
   const HaldorCalendarPage({super.key});
 
+  static const String path = '/haldor-calendar';
+
   @override
   Widget Function(BuildContext) setup() {
     final calendarStore = inject(calendarStoreKey);

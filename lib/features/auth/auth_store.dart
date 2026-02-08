@@ -1,23 +1,100 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
 import 'package:pocketbase/pocketbase.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/pocketbase_types.dart';
 
 class AuthStore {
   final PocketBase _pb;
 
-  AuthStore(this._pb);
+  AuthStore(this._pb) {
+    _initialize();
+  }
 
   final _currentUser = ref<User?>(null);
   final _loading = ref<bool>(false);
 
+  late final _isAuthenticated = computed(() => _currentUser.value != null);
+
   Ref<User?> get currentUser => _currentUser;
   Ref<bool> get loading => _loading;
-
-  bool get isAuthenticated => _pb.authStore.isValid;
+  ReadonlyRef<bool> get isAuthenticated => _isAuthenticated;
 
   String? get currentSchoolId => _currentUser.value?.schoolId;
 
+  void _initialize() {
+    // Listen to PocketBase auth changes and sync to reactive refs
+    _pb.authStore.onChange.listen((event) {
+      if (_pb.authStore.isValid) {
+        final record = _pb.authStore.record;
+        if (record != null) {
+          _currentUser.value = User.fromRecord(record);
+        }
+      } else {
+        _currentUser.value = null;
+      }
+    });
+
+    // Initialize current user if already authenticated
+    if (_pb.authStore.isValid && _pb.authStore.record != null) {
+      _currentUser.value = User.fromRecord(_pb.authStore.record!);
+    }
+  }
+
+  /// Sign in with Microsoft OAuth2
+  Future<bool> signInWithMicrosoft() async {
+    _loading.value = true;
+
+    try {
+      debugPrint('=== Starting Microsoft OAuth2 flow ===');
+
+      // Authenticate with Microsoft OAuth2
+      // PocketBase handles the OAuth flow and token exchange
+      final authData = await _pb.collection(Collections.users).authWithOAuth2(
+        'microsoft',
+        // URL callback to open the OAuth URL in browser
+        (url) async {
+          debugPrint('OAuth URL received from PocketBase:');
+          debugPrint('  Full URL: $url');
+          debugPrint('  Host: ${url.host}');
+          debugPrint('  Path: ${url.path}');
+          debugPrint('  Query params: ${url.queryParameters}');
+
+          // Open the OAuth URL in the system browser
+          if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+            throw Exception('Could not launch OAuth URL: $url');
+          }
+
+          debugPrint('Browser opened successfully, waiting for OAuth callback...');
+        },
+      );
+
+      debugPrint('=== OAuth2 flow completed successfully ===');
+      debugPrint('User authenticated: ${authData.record.id}');
+      _currentUser.value = User.fromRecord(authData.record);
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('=== Microsoft OAuth2 ERROR ===');
+      debugPrint('Error type: ${e.runtimeType}');
+      debugPrint('Error message: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      // Try to extract more details from ClientException
+      if (e.toString().contains('ClientException')) {
+        debugPrint('This is a PocketBase client error - check:');
+        debugPrint('  1. Client Secret in PocketBase');
+        debugPrint('  2. Token URL in PocketBase');
+        debugPrint('  3. User API URL in PocketBase');
+        debugPrint('  4. Azure redirect URI matches PocketBase');
+      }
+
+      rethrow;
+    } finally {
+      _loading.value = false;
+    }
+  }
+
+  // Email/password authentication (commented out for now)
   Future<bool> signIn(String email, String password) async {
     _loading.value = true;
     try {

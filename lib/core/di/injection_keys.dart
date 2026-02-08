@@ -39,3 +39,14 @@ final socialMediaStoreKey = InjectionKey<SocialMediaStore>('socialMediaStore');
 final foldersAndFilesStoreKey = InjectionKey<FoldersAndFilesStore>(
   'foldersAndFilesStore',
 );
+
+// Global AuthStore reference for router guard
+app_auth.AuthStore? _globalAuthStore;
+
+void setGlobalAuthStore(app_auth.AuthStore store) {
+  _globalAuthStore = store;
+}
+
+app_auth.AuthStore? getGlobalAuthStore() {
+  return _globalAuthStore;
+}

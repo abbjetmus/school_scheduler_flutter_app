@@ -7,6 +7,8 @@ import '../services/ble_reader_service.dart';
 class ReaderSetupPage extends CompositionWidget {
   const ReaderSetupPage({super.key});
 
+  static const String path = '/reader-setup';
+
   @override
   Widget Function(BuildContext) setup() {
     final bleService = inject(bleReaderServiceKey);

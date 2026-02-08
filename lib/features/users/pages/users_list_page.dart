@@ -6,6 +6,8 @@ import '../../../core/models/pocketbase_types.dart';
 class UsersListPage extends CompositionWidget {
   const UsersListPage({super.key});
 
+  static const String path = '/users';
+
   @override
   Widget Function(BuildContext) setup() {
     final usersStore = inject(usersStoreKey);

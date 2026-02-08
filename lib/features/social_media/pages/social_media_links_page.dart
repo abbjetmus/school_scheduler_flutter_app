@@ -7,6 +7,8 @@ import '../../auth/auth_store.dart' as app_auth;
 class SocialMediaLinksPage extends CompositionWidget {
   const SocialMediaLinksPage({super.key});
 
+  static const String path = '/social-media-links';
+
   @override
   Widget Function(BuildContext) setup() {
     final socialMediaStore = inject(socialMediaStoreKey);

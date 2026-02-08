@@ -1,5 +1,4 @@
 import 'package:go_router/go_router.dart';
-import 'package:pocketbase/pocketbase.dart';
 import '../../features/attendance/pages/attendance_page.dart';
 import '../../features/attendance/pages/reader_setup_page.dart';
 import '../../features/auth/pages/login_page.dart';
@@ -21,26 +20,12 @@ import '../../features/users/pages/users_list_page.dart';
 import '../../features/settings/pages/settings_page.dart';
 import '../../features/social_media/pages/social_media_links_page.dart';
 import '../../features/folders_and_files/pages/folders_and_files_page.dart';
-import '../widgets/app_shell.dart';
+import 'auth_guard.dart';
 
-GoRouter createAppRouter(PocketBase pb) {
+GoRouter createAppRouter() {
   return GoRouter(
-    initialLocation: '/login',
-    redirect: (context, state) {
-      final isAuthenticated = pb.authStore.isValid;
-      final isAuthRoute = state.uri.toString().startsWith('/login') ||
-          state.uri.toString().startsWith('/register') ||
-          state.uri.toString().startsWith('/forgot-password') ||
-          state.uri.toString().startsWith('/email-verification');
-
-      if (!isAuthenticated && !isAuthRoute) {
-        return '/login';
-      }
-      if (isAuthenticated && isAuthRoute) {
-        return '/dashboard';
-      }
-      return null;
-    },
+    initialLocation: '/dashboard',
+    redirect: authGuard,
     routes: [
       // Auth routes (no shell)
       GoRoute(
@@ -62,115 +47,110 @@ GoRouter createAppRouter(PocketBase pb) {
         ),
       ),
 
-      // Authenticated routes (with shell)
-      ShellRoute(
-        builder: (context, state, child) => AppShell(child: child),
-        routes: [
-          GoRoute(
-            path: '/dashboard',
-            builder: (context, state) => const DashboardPage(),
-          ),
-          GoRoute(
-            path: '/haldor-calendar',
-            builder: (context, state) => const HaldorCalendarPage(),
-          ),
+      // Authenticated routes
+      GoRoute(
+        path: '/dashboard',
+        builder: (context, state) => const DashboardPage(),
+      ),
+      GoRoute(
+        path: '/haldor-calendar',
+        builder: (context, state) => const HaldorCalendarPage(),
+      ),
 
-          // Students
-          GoRoute(
-            path: '/students',
-            builder: (context, state) => const StudentsListPage(),
-          ),
-          GoRoute(
-            path: '/import-students',
-            builder: (context, state) => const ImportStudentsPage(),
-          ),
-          GoRoute(
-            path: '/import-haldor-ids',
-            builder: (context, state) => const ImportHaldorIdsPage(),
-          ),
+      // Students
+      GoRoute(
+        path: '/students',
+        builder: (context, state) => const StudentsListPage(),
+      ),
+      GoRoute(
+        path: '/import-students',
+        builder: (context, state) => const ImportStudentsPage(),
+      ),
+      GoRoute(
+        path: '/import-haldor-ids',
+        builder: (context, state) => const ImportHaldorIdsPage(),
+      ),
 
-          // Classes
-          GoRoute(
-            path: '/classes',
-            builder: (context, state) => const ClassesListPage(),
-          ),
-          GoRoute(
-            path: '/import-classes',
-            builder: (context, state) => const ImportClassesPage(),
-          ),
+      // Classes
+      GoRoute(
+        path: '/classes',
+        builder: (context, state) => const ClassesListPage(),
+      ),
+      GoRoute(
+        path: '/import-classes',
+        builder: (context, state) => const ImportClassesPage(),
+      ),
 
-          // Surveys
-          GoRoute(
-            path: '/surveys',
-            builder: (context, state) => const SurveysListPage(),
-          ),
-          GoRoute(
-            path: '/create-survey',
-            builder: (context, state) => const CreateSurveyPage(),
-          ),
-          GoRoute(
-            path: '/edit-survey/:id',
-            builder: (context, state) => CreateSurveyPage(
-              surveyId: state.pathParameters['id'],
-            ),
-          ),
+      // Surveys
+      GoRoute(
+        path: '/surveys',
+        builder: (context, state) => const SurveysListPage(),
+      ),
+      GoRoute(
+        path: '/create-survey',
+        builder: (context, state) => const CreateSurveyPage(),
+      ),
+      GoRoute(
+        path: '/edit-survey/:id',
+        builder: (context, state) => CreateSurveyPage(
+          surveyId: state.pathParameters['id'],
+        ),
+      ),
 
-          // Subscriptions
-          GoRoute(
-            path: '/subscriptions',
-            builder: (context, state) => const SubscriptionsListPage(),
-          ),
-          GoRoute(
-            path: '/create-subscription',
-            builder: (context, state) => const CreateSubscriptionPage(),
-          ),
-          GoRoute(
-            path: '/edit-subscription/:id',
-            builder: (context, state) => CreateSubscriptionPage(
-              subscriptionId: state.pathParameters['id'],
-            ),
-          ),
+      // Subscriptions
+      GoRoute(
+        path: '/subscriptions',
+        builder: (context, state) => const SubscriptionsListPage(),
+      ),
+      GoRoute(
+        path: '/create-subscription',
+        builder: (context, state) => const CreateSubscriptionPage(),
+      ),
+      GoRoute(
+        path: '/edit-subscription/:id',
+        builder: (context, state) => CreateSubscriptionPage(
+          subscriptionId: state.pathParameters['id'],
+        ),
+      ),
 
-          // Users
-          GoRoute(
-            path: '/users',
-            builder: (context, state) => const UsersListPage(),
-          ),
+      // Users
+      GoRoute(
+        path: '/users',
+        builder: (context, state) => const UsersListPage(),
+      ),
 
-          // Settings
-          GoRoute(
-            path: '/settings',
-            builder: (context, state) => const SettingsPage(),
-          ),
+      // Settings
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsPage(),
+      ),
 
-          // Social Media
-          GoRoute(
-            path: '/social-media-links',
-            builder: (context, state) => const SocialMediaLinksPage(),
-          ),
+      // Social Media
+      GoRoute(
+        path: '/social-media-links',
+        builder: (context, state) => const SocialMediaLinksPage(),
+      ),
 
-          // Folders & Files
-          GoRoute(
-            path: '/folders-and-files',
-            builder: (context, state) => const FoldersAndFilesPage(),
-          ),
-          GoRoute(
-            path: '/folders-and-files/:id',
-            builder: (context, state) => FoldersAndFilesPage(
-              folderId: state.pathParameters['id'],
-            ),
-          ),
+      // Folders & Files
+      GoRoute(
+        path: '/folders-and-files',
+        builder: (context, state) => const FoldersAndFilesPage(),
+      ),
+      GoRoute(
+        path: '/folders-and-files/:id',
+        builder: (context, state) => FoldersAndFilesPage(
+          folderId: state.pathParameters['id'],
+        ),
+      ),
 
-          // Attendance (existing)
-          GoRoute(
-            path: '/',
-            builder: (context, state) => const AttendancePage(),
-          ),
-          GoRoute(
-            path: '/reader-setup',
-            builder: (context, state) => const ReaderSetupPage(),
-          ),
-        ],
+      // Attendance
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const AttendancePage(),
+      ),
+      GoRoute(
+        path: '/reader-setup',
+        builder: (context, state) => const ReaderSetupPage(),
       ),
     ],
   );

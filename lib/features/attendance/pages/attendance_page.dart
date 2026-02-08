@@ -15,6 +15,8 @@ class _LogEntry {
 class AttendancePage extends CompositionWidget {
   const AttendancePage({super.key});
 
+  static const String path = '/';
+
   @override
   Widget Function(BuildContext) setup() {
     final bleService = inject(bleReaderServiceKey);

@@ -6,6 +6,8 @@ import '../../../core/di/injection_keys.dart';
 class SurveysListPage extends CompositionWidget {
   const SurveysListPage({super.key});
 
+  static const String path = '/surveys';
+
   @override
   Widget Function(BuildContext) setup() {
     final surveysStore = inject(surveysStoreKey);

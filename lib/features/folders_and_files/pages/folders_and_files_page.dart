@@ -10,6 +10,8 @@ class FoldersAndFilesPage extends CompositionWidget {
 
   const FoldersAndFilesPage({super.key, this.folderId});
 
+  static const String path = '/folders-and-files';
+
   @override
   Widget Function(BuildContext) setup() {
     final foldersStore = inject(foldersAndFilesStoreKey);

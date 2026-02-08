@@ -15,14 +15,26 @@ class LoginPage extends CompositionWidget {
     final errorMessage = ref<String?>(null);
     final contextRef = useContext();
 
+    // Microsoft OAuth2 login handler
+    Future<void> handleMicrosoftLogin() async {
+      errorMessage.value = null;
+      try {
+        await authStore.signInWithMicrosoft();
+        final ctx = contextRef.value;
+        if (ctx != null && ctx.mounted) {
+          ctx.go('/dashboard');
+        }
+      } catch (e) {
+        errorMessage.value = 'Microsoft-inloggning misslyckades: $e';
+      }
+    }
+
+    // Email/password login (commented dout for now)
     Future<void> handleLogin() async {
       if (!formKey.currentState!.validate()) return;
       errorMessage.value = null;
       try {
-        await authStore.signIn(
-          emailController.text.trim(),
-          passwordController.text,
-        );
+        await authStore.signIn(emailController.text.trim(), passwordController.text);
         final ctx = contextRef.value;
         if (ctx != null && ctx.mounted) {
           ctx.go('/dashboard');
@@ -46,35 +58,44 @@ class LoginPage extends CompositionWidget {
                   children: [
                     const Icon(Icons.school, size: 80, color: Colors.blue),
                     const SizedBox(height: 16),
-                    const Text(
-                      'School Scheduler',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    const Text('School Scheduler', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 32),
                     if (errorMessage.value != null)
                       Container(
                         padding: const EdgeInsets.all(12),
                         margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
                         child: Row(
                           children: [
                             const Icon(Icons.error, color: Colors.red),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                errorMessage.value!,
-                                style: const TextStyle(color: Colors.red),
-                              ),
+                              child: Text(errorMessage.value!, style: const TextStyle(color: Colors.red)),
                             ),
                           ],
                         ),
                       ),
+
+                    // Microsoft OAuth2 Login Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: authStore.loading.value ? null : handleMicrosoftLogin,
+                        icon: authStore.loading.value
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.login, size: 24),
+                        label: const Text('Logga in med Microsoft', style: TextStyle(fontSize: 16)),
+                        style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.blue, width: 2)),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 8),
+
+                    // Email/Password login (commented out for now)
+                    /*
                     TextFormField(
                       controller: emailController,
                       decoration: const InputDecoration(
@@ -127,6 +148,7 @@ class LoginPage extends CompositionWidget {
                       onPressed: () => context.push('/register'),
                       child: const Text('Skapa konto'),
                     ),
+                    */
                   ],
                 ),
               ),

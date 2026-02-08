@@ -8,6 +8,8 @@ import '../../auth/auth_store.dart' as app_auth;
 class ClassesListPage extends CompositionWidget {
   const ClassesListPage({super.key});
 
+  static const String path = '/classes';
+
   @override
   Widget Function(BuildContext) setup() {
     final classesStore = inject(classesStoreKey);

@@ -7,6 +7,8 @@ import '../../../core/models/pocketbase_types.dart';
 class SettingsPage extends CompositionWidget {
   const SettingsPage({super.key});
 
+  static const String path = '/settings';
+
   @override
   Widget Function(BuildContext) setup() {
     final settingsStore = inject(settingsStoreKey);
@@ -68,9 +70,9 @@ class SettingsPage extends CompositionWidget {
               onPressed: () async {
                 final success = await store.updateSchoolName(controller.text);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(success ? 'Skolnamn uppdaterat' : 'Misslyckades')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(success ? 'Skolnamn uppdaterat' : 'Misslyckades')));
                 }
               },
               child: const Text('Spara'),
@@ -101,9 +103,9 @@ class SettingsPage extends CompositionWidget {
               onPressed: () async {
                 final success = await store.updateSchoolAddress(controller.text);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(success ? 'Adress uppdaterad' : 'Misslyckades')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(success ? 'Adress uppdaterad' : 'Misslyckades')));
                 }
               },
               child: const Text('Spara'),
@@ -130,10 +132,7 @@ class SettingsPage extends CompositionWidget {
                 Expanded(
                   child: TextField(
                     controller: controller,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: '#RRGGBB',
-                    ),
+                    decoration: const InputDecoration(border: OutlineInputBorder(), hintText: '#RRGGBB'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -153,9 +152,9 @@ class SettingsPage extends CompositionWidget {
               onPressed: () async {
                 final success = await store.updateSchoolColor(controller.text);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(success ? 'Färg uppdaterad' : 'Misslyckades')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(success ? 'Färg uppdaterad' : 'Misslyckades')));
                 }
               },
               child: const Text('Spara'),
@@ -194,20 +193,14 @@ class SettingsPage extends CompositionWidget {
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () async {
-                final result = await FilePicker.platform.pickFiles(
-                  type: FileType.image,
-                  withData: true,
-                );
+                final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
 
                 if (result != null && result.files.single.bytes != null) {
-                  final success = await store.updateSchoolImage(
-                    result.files.single.bytes!,
-                    result.files.single.name,
-                  );
+                  final success = await store.updateSchoolImage(result.files.single.bytes!, result.files.single.name);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(success ? 'Bild uppdaterad' : 'Misslyckades')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(success ? 'Bild uppdaterad' : 'Misslyckades')));
                   }
                 }
               },
@@ -240,9 +233,9 @@ class SettingsPage extends CompositionWidget {
                     final updated = List<String>.from(store.allowedEmailDomains)..remove(domain);
                     final success = await store.updateAllowedEmailDomains(updated);
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(success ? 'Domän borttagen' : 'Misslyckades')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(success ? 'Domän borttagen' : 'Misslyckades')));
                     }
                   },
                 );
@@ -254,10 +247,7 @@ class SettingsPage extends CompositionWidget {
                 Expanded(
                   child: TextField(
                     controller: controller,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'exempel.se',
-                    ),
+                    decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'exempel.se'),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -269,13 +259,9 @@ class SettingsPage extends CompositionWidget {
                       if (context.mounted) {
                         if (success) {
                           controller.clear();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Domän tillagd')),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Domän tillagd')));
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Misslyckades')),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Misslyckades')));
                         }
                       }
                     }
@@ -310,9 +296,9 @@ class SettingsPage extends CompositionWidget {
               onPressed: () async {
                 final success = await store.updateHaldorSchoolId(controller.text);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(success ? 'Haldor Skol-ID uppdaterat' : 'Misslyckades')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(success ? 'Haldor Skol-ID uppdaterat' : 'Misslyckades')));
                 }
               },
               child: const Text('Spara'),
