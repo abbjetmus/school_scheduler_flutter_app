@@ -40,6 +40,7 @@ class StudentsStore {
     int perPage = 50,
     String? search,
   }) async {
+    _loading.value = true;
     try {
       final schoolId = _authStore.currentSchoolId;
       var filter = schoolId != null ? 'class.school="$schoolId"' : '';
@@ -56,6 +57,7 @@ class StudentsStore {
           .getList(page: page, perPage: perPage, filter: filter, sort: 'name');
 
       final items = result.items.map((r) => Student.fromRecord(r)).toList();
+      _students.value = items;
       return (
         items: items,
         totalPages: result.totalPages,
@@ -63,7 +65,10 @@ class StudentsStore {
       );
     } catch (e) {
       debugPrint('StudentsStore: Error fetching paginated students: $e');
+      _students.value = [];
       return (items: <Student>[], totalPages: 0, totalItems: 0);
+    } finally {
+      _loading.value = false;
     }
   }
 

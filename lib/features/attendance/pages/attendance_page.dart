@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/di/injection_keys.dart';
@@ -26,6 +27,10 @@ class AttendancePage extends CompositionWidget {
     final log = ref<List<_LogEntry>>([]);
     final pendingCount = ref(0);
 
+    // Controller for capturing keyboard input from NFC reader in HID mode
+    final (cardInputController, textRef, valueRef) = useTextEditingController();
+    final cardInputFocusNode = FocusNode();
+
     void addLog(String message, {bool isError = false}) {
       log.value = [_LogEntry(message, isError: isError), ...log.value];
       if (log.value.length > 50) {
@@ -33,17 +38,30 @@ class AttendancePage extends CompositionWidget {
       }
     }
 
+    // Handle card ID submitted via keyboard input (reader in HID mode)
+    void onCardInputSubmitted(String value) {
+      final cardId = value.trim();
+      if (cardId.isNotEmpty) {
+        bleService.submitCardId(cardId);
+      }
+      cardInputController.clear();
+      // Re-focus the input field for the next card
+      cardInputFocusNode.requestFocus();
+    }
+
     // Listen to BLE reader state
     bleService.stateStream.listen((state) {
       bleState.value = state;
       if (state == BleReaderState.connected) {
-        addLog('Reader connected');
+        addLog('Reader connected (keyboard mode)');
+        // Auto-focus the input field when reader connects
+        cardInputFocusNode.requestFocus();
       } else if (state == BleReaderState.disconnected) {
         addLog('Reader disconnected', isError: true);
       }
     });
 
-    // Listen to card scans from BLE reader
+    // Listen to card scans (from both keyboard and BLE data modes)
     bleService.cardIdStream.listen((cardId) {
       addLog('Card scanned: $cardId');
       queueService.enqueue(cardId);
@@ -60,6 +78,15 @@ class AttendancePage extends CompositionWidget {
     queueService.errorStream.listen((error) {
       addLog(error, isError: true);
       pendingCount.value = queueService.pendingCount;
+    });
+
+    onMounted(() {
+      // Auto-focus the card input when the page loads
+      cardInputFocusNode.requestFocus();
+    });
+
+    onUnmounted(() {
+      cardInputFocusNode.dispose();
     });
 
     return (context) {
@@ -109,6 +136,35 @@ class AttendancePage extends CompositionWidget {
               ),
             ),
             const Divider(height: 1),
+
+            // Card input field - captures keyboard input from NFC reader in HID mode
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: cardInputController,
+                focusNode: cardInputFocusNode,
+                decoration: InputDecoration(
+                  labelText: 'Card ID',
+                  hintText: 'Tap a card on the reader...',
+                  prefixIcon: const Icon(Icons.contactless),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: () => onCardInputSubmitted(cardInputController.text),
+                  ),
+                  border: const OutlineInputBorder(),
+                  helperText: state == BleReaderState.connected
+                      ? 'Reader connected — card IDs will appear here automatically'
+                      : 'Connect a reader, or type a card ID manually',
+                ),
+                // Reader types the card ID + Enter, so onSubmitted captures it
+                onSubmitted: onCardInputSubmitted,
+                // Prevent the input from being visible (card IDs are just numbers/hex)
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[a-fA-F0-9]')),
+                ],
+                autofocus: true,
+              ),
+            ),
 
             // Attendance log
             Expanded(

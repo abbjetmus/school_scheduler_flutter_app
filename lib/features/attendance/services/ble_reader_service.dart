@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 enum BleReaderState {
@@ -11,9 +12,8 @@ enum BleReaderState {
 
 class BleReaderService {
   BluetoothDevice? _device;
-  BluetoothCharacteristic? _notifyCharacteristic;
   StreamSubscription? _connectionSubscription;
-  StreamSubscription? _characteristicSubscription;
+  final List<StreamSubscription> _charSubscriptions = [];
 
   final _stateController = StreamController<BleReaderState>.broadcast();
   final _cardIdController = StreamController<String>.broadcast();
@@ -27,20 +27,6 @@ class BleReaderService {
   BluetoothDevice? get connectedDevice => _device;
 
   bool _autoReconnect = true;
-
-  // Known BLE service UUIDs commonly used by NFC card readers
-  static const _knownServiceUuids = [
-    'ffe0', // Common HM-10/HM-19 BLE modules
-    '6e400001-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART Service
-    '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent UART
-  ];
-
-  // Known characteristic UUIDs for receiving card data
-  static const _knownNotifyUuids = [
-    'ffe1', // HM-10/HM-19 notify characteristic
-    '6e400003-b5a3-f393-e0a9-e50e24dcca9e', // Nordic UART TX
-    '49535343-1e4d-4bd9-ba61-23c647249616', // ISSC transparent TX
-  ];
 
   void _setState(BleReaderState newState) {
     _state = newState;
@@ -61,10 +47,8 @@ class BleReaderService {
     final results = FlutterBluePlus.lastScanResults;
     _setState(BleReaderState.disconnected);
 
-    // Filter to devices that advertise a name (likely real devices)
-    return results
-        .where((r) => r.device.platformName.isNotEmpty)
-        .toList()
+    // Return all devices, including those without advertised names
+    return results.toList()
       ..sort((a, b) => b.rssi.compareTo(a.rssi));
   }
 
@@ -89,7 +73,7 @@ class BleReaderService {
         }
       });
 
-      // Discover services and find the notify characteristic
+      // Discover services and subscribe to notifications
       await _discoverAndSubscribe(device);
 
       _setState(BleReaderState.connected);
@@ -104,74 +88,99 @@ class BleReaderService {
   Future<void> _discoverAndSubscribe(BluetoothDevice device) async {
     final services = await device.discoverServices();
 
-    // First pass: try known NFC reader service/characteristic UUIDs
+    debugPrint('BLE: Discovered ${services.length} services');
     for (final service in services) {
-      final serviceUuid = service.serviceUuid.toString().toLowerCase();
-      final isKnownService =
-          _knownServiceUuids.any((uuid) => serviceUuid.contains(uuid));
-
-      if (!isKnownService) continue;
-
-      for (final characteristic in service.characteristics) {
-        if (characteristic.properties.notify ||
-            characteristic.properties.indicate) {
-          final charUuid =
-              characteristic.characteristicUuid.toString().toLowerCase();
-          final isKnownChar =
-              _knownNotifyUuids.any((uuid) => charUuid.contains(uuid));
-
-          if (isKnownChar) {
-            await _subscribeToCharacteristic(characteristic);
-            return;
-          }
-        }
+      debugPrint('BLE:   Service: ${service.serviceUuid} '
+          '(${service.characteristics.length} characteristics)');
+      for (final c in service.characteristics) {
+        debugPrint('BLE:     Char: ${c.characteristicUuid} '
+            'props: N=${c.properties.notify} R=${c.properties.read} '
+            'W=${c.properties.write} I=${c.properties.indicate}');
       }
     }
 
-    // Second pass: find any notify-capable characteristic on any service
+    // Subscribe to ALL notify/indicate-capable characteristics
+    _cancelCharSubscriptions();
+    var subscriptionCount = 0;
     for (final service in services) {
       for (final characteristic in service.characteristics) {
         if (characteristic.properties.notify ||
             characteristic.properties.indicate) {
           await _subscribeToCharacteristic(characteristic);
-          return;
+          subscriptionCount++;
         }
       }
     }
 
-    throw Exception('No suitable NFC data characteristic found on device');
+    debugPrint('BLE: Subscribed to $subscriptionCount notify characteristics');
   }
 
   Future<void> _subscribeToCharacteristic(
     BluetoothCharacteristic characteristic,
   ) async {
-    await characteristic.setNotifyValue(true);
-    _notifyCharacteristic = characteristic;
-
-    _characteristicSubscription?.cancel();
-    _characteristicSubscription =
-        characteristic.lastValueStream.listen((value) {
+    // Set up listener BEFORE enabling notifications (flutter_blue_plus best practice)
+    final sub = characteristic.onValueReceived.listen((value) {
+      final hex = value
+          .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+          .join(' ');
+      debugPrint('BLE: Received ${value.length} bytes from '
+          '${characteristic.characteristicUuid}: $hex');
       if (value.isNotEmpty) {
-        _handleCardData(value);
+        _handleBleData(value);
       }
     });
+
+    _charSubscriptions.add(sub);
+
+    if (_device != null) {
+      _device!.cancelWhenDisconnected(sub);
+    }
+
+    await characteristic.setNotifyValue(true);
+    debugPrint('BLE: Subscribed to ${characteristic.characteristicUuid}');
   }
 
-  void _handleCardData(List<int> data) {
-    // Parse card ID as uppercase hex string (most common format for NFC UIDs)
-    final hexId = data
-        .map((b) => b.toRadixString(16).padLeft(2, '0'))
-        .join('')
-        .toUpperCase();
+  void _handleBleData(List<int> data) {
+    // Filter known ack/status responses that are NOT card data
+    const ackPattern = [0xFF, 0x02, 0x01, 0xFF, 0x03, 0x02, 0xFE];
+    if (_listEquals(data, ackPattern)) return;
 
-    if (hexId.isNotEmpty) {
+    if (data.length >= 2) {
+      final hexId = data
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join('')
+          .toUpperCase();
+      debugPrint('BLE: Card ID received via BLE: $hexId');
       _cardIdController.add(hexId);
     }
   }
 
+  /// Submit a card ID from any source (keyboard input, manual entry, etc.)
+  void submitCardId(String cardId) {
+    final trimmed = cardId.trim();
+    if (trimmed.isNotEmpty) {
+      debugPrint('BLE: Card ID submitted: $trimmed');
+      _cardIdController.add(trimmed);
+    }
+  }
+
+  bool _listEquals(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  void _cancelCharSubscriptions() {
+    for (final sub in _charSubscriptions) {
+      sub.cancel();
+    }
+    _charSubscriptions.clear();
+  }
+
   void _handleDisconnection() {
-    _characteristicSubscription?.cancel();
-    _notifyCharacteristic = null;
+    _cancelCharSubscriptions();
     _setState(BleReaderState.disconnected);
 
     if (_autoReconnect && _device != null) {
@@ -189,15 +198,12 @@ class BleReaderService {
     });
   }
 
-  /// Disconnect from the current device and stop auto-reconnect.
   Future<void> disconnect() async {
     _autoReconnect = false;
-    _characteristicSubscription?.cancel();
+    _cancelCharSubscriptions();
     _connectionSubscription?.cancel();
-    await _notifyCharacteristic?.setNotifyValue(false);
     await _device?.disconnect();
     _device = null;
-    _notifyCharacteristic = null;
     _setState(BleReaderState.disconnected);
   }
 
@@ -207,7 +213,7 @@ class BleReaderService {
 
   void dispose() {
     _autoReconnect = false;
-    _characteristicSubscription?.cancel();
+    _cancelCharSubscriptions();
     _connectionSubscription?.cancel();
     _stateController.close();
     _cardIdController.close();
