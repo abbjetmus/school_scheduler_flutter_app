@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:nfc_manager/nfc_manager.dart';
+import 'package:nfc_manager/nfc_manager_android.dart';
+import 'package:nfc_manager/nfc_manager_ios.dart';
 
 /// Platform-aware NFC reading service.
 /// Uses nfc_manager on Android/iOS, falls back to manual input on desktop.
@@ -46,6 +48,7 @@ class NfcReaderService {
         NfcPollingOption.iso14443,
         NfcPollingOption.iso15693,
       },
+      invalidateAfterFirstReadIos: false,
       onDiscovered: (NfcTag tag) async {
         final uid = _extractUid(tag);
         if (uid != null && uid.isNotEmpty) {
@@ -56,7 +59,8 @@ class NfcReaderService {
         // On iOS, briefly stop and restart to allow next scan
         // On Android, session stays active automatically
         if (Platform.isIOS) {
-          await NfcManager.instance.stopSession(alertMessage: 'Kort skannat!');
+          await NfcManager.instance
+              .stopSession(alertMessageIos: 'Kort skannat!');
           // Restart session for next card
           await Future.delayed(const Duration(milliseconds: 500));
           if (_isSessionActive) {
@@ -97,31 +101,43 @@ class NfcReaderService {
 
   /// Extract UID from an NFC tag, trying different tag types.
   String? _extractUid(NfcTag tag) {
-    // Try NFC-A (most common — MIFARE, NTAG, etc.)
-    final nfcA = NfcA.from(tag);
-    if (nfcA != null) {
-      return _bytesToHex(nfcA.identifier);
+    if (!kIsWeb && Platform.isAndroid) {
+      return _extractUidAndroid(tag);
+    } else if (!kIsWeb && Platform.isIOS) {
+      return _extractUidIos(tag);
+    }
+    return null;
+  }
+
+  String? _extractUidAndroid(NfcTag tag) {
+    // On Android, NfcTagAndroid gives us the tag ID directly
+    final androidTag = NfcTagAndroid.from(tag);
+    if (androidTag != null) {
+      return _bytesToHex(androidTag.id);
+    }
+    return null;
+  }
+
+  String? _extractUidIos(NfcTag tag) {
+    // Try MiFare (most common — MIFARE, NTAG, etc.)
+    final mifare = MiFareIos.from(tag);
+    if (mifare != null) {
+      return _bytesToHex(mifare.identifier);
     }
 
-    // Try NFC-B
-    final nfcB = NfcB.from(tag);
-    if (nfcB != null) {
-      return _bytesToHex(nfcB.identifier);
+    // Try FeliCa
+    final felica = FeliCaIos.from(tag);
+    if (felica != null) {
+      return _bytesToHex(felica.currentIDm);
     }
 
-    // Try NFC-F (FeliCa)
-    final nfcF = NfcF.from(tag);
-    if (nfcF != null) {
-      return _bytesToHex(nfcF.identifier);
+    // Try ISO 15693
+    final iso15693 = Iso15693Ios.from(tag);
+    if (iso15693 != null) {
+      return _bytesToHex(iso15693.identifier);
     }
 
-    // Try NFC-V (ISO 15693)
-    final nfcV = NfcV.from(tag);
-    if (nfcV != null) {
-      return _bytesToHex(nfcV.identifier);
-    }
-
-    debugPrint('NFC: Unknown tag type, raw data: ${tag.data}');
+    debugPrint('NFC: Unknown tag type');
     return null;
   }
 

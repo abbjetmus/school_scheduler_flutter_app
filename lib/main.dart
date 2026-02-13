@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
 import 'features/attendance/repositories/attendance_repository.dart';
-import 'features/attendance/services/ble_reader_service.dart';
 import 'features/attendance/services/nfc_reader_service.dart';
+import 'features/attendance/services/usb_reader_service.dart';
 import 'features/attendance/services/attendance_queue_service.dart';
 import 'features/auth/auth_store.dart' as app_auth;
 import 'features/calendar/calendar_store.dart';
@@ -38,8 +38,8 @@ class AppRoot extends CompositionWidget {
 
     // Existing attendance services
     provide(pocketBaseKey, pb);
-    provide(bleReaderServiceKey, BleReaderService());
     provide(nfcReaderServiceKey, NfcReaderService());
+    provide(usbReaderServiceKey, UsbReaderService());
     provide(attendanceRepositoryKey, attendanceRepo);
     provide(attendanceQueueServiceKey, AttendanceQueueService(attendanceRepo));
 

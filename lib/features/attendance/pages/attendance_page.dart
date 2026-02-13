@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/di/injection_keys.dart';
-import '../services/ble_reader_service.dart';
+import '../services/usb_reader_service.dart';
 
 class _LogEntry {
   final String message;
@@ -20,14 +20,14 @@ class AttendancePage extends CompositionWidget {
 
   @override
   Widget Function(BuildContext) setup() {
-    final bleService = inject(bleReaderServiceKey);
+    final usbService = inject(usbReaderServiceKey);
     final queueService = inject(attendanceQueueServiceKey);
 
-    final bleState = ref(bleService.state);
+    final usbState = ref(usbService.state);
     final log = ref<List<_LogEntry>>([]);
     final pendingCount = ref(0);
 
-    // Controller for capturing keyboard input from NFC reader in HID mode
+    // Controller for manual card input
     final (cardInputController, textRef, valueRef) = useTextEditingController();
     final cardInputFocusNode = FocusNode();
 
@@ -38,32 +38,31 @@ class AttendancePage extends CompositionWidget {
       }
     }
 
-    // Handle card ID submitted via keyboard input (reader in HID mode)
+    // Handle card ID submitted via manual input
     void onCardInputSubmitted(String value) {
       final cardId = value.trim();
       if (cardId.isNotEmpty) {
-        bleService.submitCardId(cardId);
+        usbService.submitCardId(cardId);
       }
       cardInputController.clear();
-      // Re-focus the input field for the next card
       cardInputFocusNode.requestFocus();
     }
 
-    // Listen to BLE reader state
-    bleService.stateStream.listen((state) {
-      bleState.value = state;
-      if (state == BleReaderState.connected) {
-        addLog('Reader connected (keyboard mode)');
-        // Auto-focus the input field when reader connects
-        cardInputFocusNode.requestFocus();
-      } else if (state == BleReaderState.disconnected) {
-        addLog('Reader disconnected', isError: true);
+    // Listen to USB reader state
+    usbService.stateStream.listen((state) {
+      usbState.value = state;
+      if (state == UsbReaderState.polling) {
+        addLog('USB-läsare aktiv — väntar på kort');
+      } else if (state == UsbReaderState.connected) {
+        addLog('USB-läsare ansluten');
+      } else if (state == UsbReaderState.disconnected) {
+        addLog('USB-läsare frånkopplad', isError: true);
       }
     });
 
-    // Listen to card scans (from both keyboard and BLE data modes)
-    bleService.cardIdStream.listen((cardId) {
-      addLog('Card scanned: $cardId');
+    // Listen to card scans from USB reader
+    usbService.cardIdStream.listen((cardId) {
+      addLog('Kort skannat: $cardId');
       queueService.enqueue(cardId);
       pendingCount.value = queueService.pendingCount;
     });
@@ -80,8 +79,15 @@ class AttendancePage extends CompositionWidget {
       pendingCount.value = queueService.pendingCount;
     });
 
-    onMounted(() {
-      // Auto-focus the card input when the page loads
+    onMounted(() async {
+      // Auto-initialize and connect USB reader
+      if (UsbReaderService.isSupported) {
+        await usbService.initialize();
+        final readers = await usbService.listReaders();
+        if (readers.length == 1) {
+          await usbService.connectToReader(readers.first);
+        }
+      }
       cardInputFocusNode.requestFocus();
     });
 
@@ -90,46 +96,45 @@ class AttendancePage extends CompositionWidget {
     });
 
     return (context) {
-      final state = bleState.value;
+      final state = usbState.value;
 
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Attendance'),
+          title: const Text('Närvaro'),
           actions: [
             IconButton(
               icon: Icon(
-                _bleIcon(state),
-                color: _bleColor(state),
+                _readerIcon(state),
+                color: _readerColor(state),
               ),
-              tooltip: 'NFC Reader Setup',
+              tooltip: 'Kortläsare',
               onPressed: () => context.push('/reader-setup'),
             ),
           ],
         ),
         body: Column(
           children: [
-            // BLE Reader status bar
+            // Reader status bar
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: _bleColor(state).withValues(alpha: 0.1),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: _readerColor(state).withValues(alpha: 0.1),
               child: Row(
                 children: [
-                  Icon(_bleIcon(state), size: 20, color: _bleColor(state)),
+                  Icon(_readerIcon(state), size: 20, color: _readerColor(state)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _bleLabel(state, bleService.connectedDevice),
+                      _readerLabel(state, usbService.connectedReaderName),
                       style: TextStyle(
-                        color: _bleColor(state),
+                        color: _readerColor(state),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                   if (pendingCount.value > 0)
                     Chip(
-                      label: Text('${pendingCount.value} pending'),
+                      label: Text('${pendingCount.value} väntande'),
                       visualDensity: VisualDensity.compact,
                     ),
                 ],
@@ -137,28 +142,26 @@ class AttendancePage extends CompositionWidget {
             ),
             const Divider(height: 1),
 
-            // Card input field - captures keyboard input from NFC reader in HID mode
+            // Manual card input field
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: TextField(
                 controller: cardInputController,
                 focusNode: cardInputFocusNode,
                 decoration: InputDecoration(
-                  labelText: 'Card ID',
-                  hintText: 'Tap a card on the reader...',
+                  labelText: 'Kort-ID',
+                  hintText: 'Lägg kortet på läsaren...',
                   prefixIcon: const Icon(Icons.contactless),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.send),
                     onPressed: () => onCardInputSubmitted(cardInputController.text),
                   ),
                   border: const OutlineInputBorder(),
-                  helperText: state == BleReaderState.connected
-                      ? 'Reader connected — card IDs will appear here automatically'
-                      : 'Connect a reader, or type a card ID manually',
+                  helperText: state == UsbReaderState.polling
+                      ? 'Läsare aktiv — kort-ID registreras automatiskt'
+                      : 'Anslut en USB-läsare, eller ange kort-ID manuellt',
                 ),
-                // Reader types the card ID + Enter, so onSubmitted captures it
                 onSubmitted: onCardInputSubmitted,
-                // Prevent the input from being visible (card IDs are just numbers/hex)
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[a-fA-F0-9]')),
                 ],
@@ -180,9 +183,9 @@ class AttendancePage extends CompositionWidget {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            state == BleReaderState.connected
-                                ? 'Ready — tap a card on the reader'
-                                : 'Connect a BLE reader to start',
+                            state == UsbReaderState.polling
+                                ? 'Redo — lägg kortet på läsaren'
+                                : 'Anslut en USB-kortläsare för att börja',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyLarge
@@ -229,46 +232,46 @@ class AttendancePage extends CompositionWidget {
     };
   }
 
-  static IconData _bleIcon(BleReaderState state) {
+  static IconData _readerIcon(UsbReaderState state) {
     switch (state) {
-      case BleReaderState.connected:
-        return Icons.bluetooth_connected;
-      case BleReaderState.connecting:
-      case BleReaderState.scanning:
-        return Icons.bluetooth_searching;
-      case BleReaderState.error:
-        return Icons.bluetooth_disabled;
-      case BleReaderState.disconnected:
-        return Icons.bluetooth;
+      case UsbReaderState.connected:
+      case UsbReaderState.polling:
+        return Icons.usb;
+      case UsbReaderState.connecting:
+        return Icons.usb;
+      case UsbReaderState.error:
+        return Icons.usb_off;
+      case UsbReaderState.disconnected:
+        return Icons.usb_off;
     }
   }
 
-  static Color _bleColor(BleReaderState state) {
+  static Color _readerColor(UsbReaderState state) {
     switch (state) {
-      case BleReaderState.connected:
+      case UsbReaderState.connected:
+      case UsbReaderState.polling:
         return Colors.green;
-      case BleReaderState.connecting:
-      case BleReaderState.scanning:
+      case UsbReaderState.connecting:
         return Colors.orange;
-      case BleReaderState.error:
+      case UsbReaderState.error:
         return Colors.red;
-      case BleReaderState.disconnected:
+      case UsbReaderState.disconnected:
         return Colors.grey;
     }
   }
 
-  static String _bleLabel(BleReaderState state, dynamic device) {
+  static String _readerLabel(UsbReaderState state, String? readerName) {
     switch (state) {
-      case BleReaderState.connected:
-        return 'Reader connected${device != null ? ': ${device.platformName}' : ''}';
-      case BleReaderState.connecting:
-        return 'Connecting to reader...';
-      case BleReaderState.scanning:
-        return 'Scanning for readers...';
-      case BleReaderState.error:
-        return 'Reader connection error — will retry';
-      case BleReaderState.disconnected:
-        return 'No reader connected';
+      case UsbReaderState.polling:
+        return 'USB-läsare aktiv${readerName != null ? ': $readerName' : ''}';
+      case UsbReaderState.connected:
+        return 'USB-läsare ansluten${readerName != null ? ': $readerName' : ''}';
+      case UsbReaderState.connecting:
+        return 'Ansluter till USB-läsare...';
+      case UsbReaderState.error:
+        return 'USB-läsarfel';
+      case UsbReaderState.disconnected:
+        return 'Ingen USB-läsare ansluten';
     }
   }
 }

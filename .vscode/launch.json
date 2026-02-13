@@ -2,6 +2,78 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Flutter (macOS - Debug)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "macos",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "Flutter (macOS - Profile)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "macos",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "Flutter (macOS - Release)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "macos",
+      "flutterMode": "release"
+    },
+    {
+      "name": "Flutter (iOS - Debug)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "ios",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "Flutter (iOS - Profile)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "ios",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "Flutter (iOS - Release)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "ios",
+      "flutterMode": "release"
+    },
+    {
+      "name": "Flutter (Android - Debug)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "android",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "Flutter (Android - Profile)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "android",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "Flutter (Android - Release)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "android",
+      "flutterMode": "release"
+    },
+    {
       "name": "Flutter (Windows - Debug)",
       "type": "dart",
       "request": "launch",

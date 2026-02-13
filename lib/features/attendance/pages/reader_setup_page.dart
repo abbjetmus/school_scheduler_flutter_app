@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
 import '../../../core/di/injection_keys.dart';
-import '../services/ble_reader_service.dart';
 import '../services/nfc_reader_service.dart';
+import '../services/usb_reader_service.dart';
 
 class ReaderSetupPage extends CompositionWidget {
   const ReaderSetupPage({super.key});
@@ -13,26 +11,26 @@ class ReaderSetupPage extends CompositionWidget {
 
   @override
   Widget Function(BuildContext) setup() {
-    final bleService = inject(bleReaderServiceKey);
     final nfcService = inject(nfcReaderServiceKey);
+    final usbService = inject(usbReaderServiceKey);
 
-    final isScanning = ref(false);
-    final scanResults = ref<List<ScanResult>>([]);
     final error = ref<String?>(null);
-    final bleState = ref(bleService.state);
+    final usbState = ref(usbService.state);
+    final usbReaders = ref<List<String>>([]);
+    final isSearchingUsb = ref(false);
     final lastCardId = ref<String?>(null);
     final nfcAvailable = ref(false);
     final nfcSessionActive = ref(false);
     final cardInputController = TextEditingController();
     final cardInputFocusNode = FocusNode();
 
-    // Listen to BLE state changes
-    bleService.stateStream.listen((state) {
-      bleState.value = state;
+    // Listen to USB reader state changes
+    usbService.stateStream.listen((state) {
+      usbState.value = state;
     });
 
-    // Listen to card IDs from both BLE and NFC
-    bleService.cardIdStream.listen((cardId) {
+    // Listen to card IDs from USB and NFC
+    usbService.cardIdStream.listen((cardId) {
       lastCardId.value = cardId;
     });
     nfcService.cardIdStream.listen((cardId) {
@@ -42,12 +40,29 @@ class ReaderSetupPage extends CompositionWidget {
       nfcSessionActive.value = active;
     });
 
-    // Check NFC availability on mount
     onMounted(() async {
+      // Check NFC availability on mobile
       nfcAvailable.value = await nfcService.isNfcAvailable();
       if (nfcAvailable.value) {
-        // Auto-start NFC session on mobile
         await nfcService.startSession();
+      }
+
+      // Auto-scan for USB readers on desktop
+      if (UsbReaderService.isSupported) {
+        await usbService.initialize();
+        final readers = await usbService.listReaders();
+        usbReaders.value = readers;
+
+        // Auto-connect if exactly one reader is found
+        if (readers.length == 1) {
+          await usbService.connectToReader(readers.first);
+        }
+      }
+
+      if (!nfcAvailable.value) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          cardInputFocusNode.requestFocus();
+        });
       }
     });
 
@@ -57,48 +72,131 @@ class ReaderSetupPage extends CompositionWidget {
       nfcService.stopSession();
     });
 
-    Future<void> startScan() async {
+    Future<void> searchUsbReaders() async {
       error.value = null;
-      isScanning.value = true;
+      isSearchingUsb.value = true;
       try {
-        final results = await bleService.scanForReaders();
-        scanResults.value = results;
+        final readers = await usbService.listReaders();
+        usbReaders.value = readers;
+        if (readers.isEmpty) {
+          error.value = 'Ingen USB-kortläsare hittades. Kontrollera att läsaren är ansluten.';
+        }
       } catch (e) {
         error.value = e.toString();
       } finally {
-        isScanning.value = false;
-      }
-    }
-
-    Future<void> connectToDevice(BluetoothDevice device) async {
-      error.value = null;
-      try {
-        await bleService.connect(device);
-      } catch (e) {
-        error.value = e.toString();
+        isSearchingUsb.value = false;
       }
     }
 
     void onCardInputSubmitted(String value) {
       final cardId = value.trim();
       if (cardId.isNotEmpty) {
-        nfcService.submitCardId(cardId);
+        lastCardId.value = cardId;
+        usbService.submitCardId(cardId);
       }
       cardInputController.clear();
       cardInputFocusNode.requestFocus();
     }
 
     return (context) {
-      final state = bleState.value;
+      final currentUsbState = usbState.value;
 
       return Scaffold(
-        appBar: AppBar(title: const Text('NFC Reader Setup')),
+        appBar: AppBar(title: const Text('Kortläsare')),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // NFC status card (mobile only)
+              // ── USB Reader Section (desktop) ──
+              if (UsbReaderService.isSupported) ...[
+                Card(
+                  color: _usbStateColor(currentUsbState).withValues(alpha: 0.1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.usb, color: _usbStateColor(currentUsbState), size: 28),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _usbStateLabel(currentUsbState),
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  if (currentUsbState == UsbReaderState.connected ||
+                                      currentUsbState == UsbReaderState.polling)
+                                    Text(
+                                      usbService.connectedReaderName ?? '',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (currentUsbState == UsbReaderState.connected ||
+                                currentUsbState == UsbReaderState.polling)
+                              TextButton(
+                                onPressed: () => usbService.disconnect(),
+                                child: const Text('Koppla från'),
+                              ),
+                          ],
+                        ),
+                        if (currentUsbState == UsbReaderState.polling) ...[
+                          const SizedBox(height: 12),
+                          const Row(
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Väntar på kort — lägg kortet på läsaren...',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // USB reader list / scan button
+                if (currentUsbState == UsbReaderState.disconnected) ...[
+                  FilledButton.icon(
+                    onPressed: isSearchingUsb.value ? null : searchUsbReaders,
+                    icon: isSearchingUsb.value
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.usb),
+                    label: Text(isSearchingUsb.value ? 'Söker...' : 'Sök USB-kortläsare'),
+                  ),
+                  const SizedBox(height: 8),
+                  if (usbReaders.value.isNotEmpty)
+                    ...usbReaders.value.map(
+                      (reader) => ListTile(
+                        leading: const Icon(Icons.credit_card),
+                        title: Text(reader),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () => usbService.connectToReader(reader),
+                      ),
+                    ),
+                ],
+                const SizedBox(height: 16),
+              ],
+
+              // ── NFC status card (mobile only) ──
               if (NfcReaderService.isNfcSupported) ...[
                 Card(
                   color: nfcAvailable.value
@@ -108,20 +206,14 @@ class ReaderSetupPage extends CompositionWidget {
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.nfc,
-                          color: nfcAvailable.value ? Colors.green : Colors.orange,
-                          size: 28,
-                        ),
+                        Icon(Icons.nfc, color: nfcAvailable.value ? Colors.green : Colors.orange, size: 28),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                nfcAvailable.value
-                                    ? 'Telefonens NFC är redo'
-                                    : 'NFC ej tillgängligt',
+                                nfcAvailable.value ? 'Telefonens NFC är redo' : 'NFC ej tillgängligt',
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               Text(
@@ -153,40 +245,7 @@ class ReaderSetupPage extends CompositionWidget {
                 const SizedBox(height: 16),
               ],
 
-              // BLE connection status card
-              Card(
-                color: _stateColor(state).withValues(alpha: 0.1),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Icon(_stateIcon(state), color: _stateColor(state), size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _stateLabel(state),
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            if (state == BleReaderState.connected && bleService.connectedDevice != null)
-                              Text(
-                                bleService.connectedDevice!.platformName,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (state == BleReaderState.connected)
-                        TextButton(onPressed: () => bleService.disconnect(), child: const Text('Koppla från')),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Card test section
+              // ── Card test section ──
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -195,29 +254,25 @@ class ReaderSetupPage extends CompositionWidget {
                     children: [
                       Text('Testa kortläsning', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      Text(
-                        NfcReaderService.isNfcSupported
-                            ? 'Håll kortet mot telefonens NFC-läsare, eller skriv in kort-ID manuellt.'
-                            : 'Anslut läsaren via USB till datorn och klicka i fältet nedan. '
-                              'Skanna ett kort — om läsaren fungerar som USB-tangentbord '
-                              'visas kort-ID:t automatiskt.',
+                      const Text(
+                        'Kort-ID visas här när du skannar ett kort med USB-läsaren eller NFC.',
+                        style: TextStyle(color: Colors.grey),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: cardInputController,
                         focusNode: cardInputFocusNode,
+                        autofocus: !NfcReaderService.isNfcSupported,
                         decoration: InputDecoration(
                           labelText: 'Kort-ID (manuell inmatning)',
+                          helperText: 'Ange kort-ID manuellt om det behövs',
                           border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.nfc),
+                          prefixIcon: const Icon(Icons.keyboard),
                           suffixIcon: IconButton(
                             icon: const Icon(Icons.send),
                             onPressed: () => onCardInputSubmitted(cardInputController.text),
                           ),
                         ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9a-fA-F]')),
-                        ],
                         onSubmitted: onCardInputSubmitted,
                       ),
                       const SizedBox(height: 12),
@@ -237,8 +292,14 @@ class ReaderSetupPage extends CompositionWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('Kort-ID mottaget!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
-                                    Text(lastCardId.value!, style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontFamily: 'monospace')),
+                                    const Text(
+                                      'Kort-ID mottaget!',
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                    ),
+                                    Text(
+                                      lastCardId.value!,
+                                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontFamily: 'monospace'),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -251,7 +312,14 @@ class ReaderSetupPage extends CompositionWidget {
               ),
               const SizedBox(height: 16),
 
-              // Troubleshooting tips
+              // ── Error display ──
+              if (error.value != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(error.value!, style: const TextStyle(color: Colors.red)),
+                ),
+
+              // ── Troubleshooting ──
               ExpansionTile(
                 title: const Text('Felsökning'),
                 leading: const Icon(Icons.help_outline),
@@ -261,114 +329,37 @@ class ReaderSetupPage extends CompositionWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (UsbReaderService.isSupported) ...[
+                          Text('USB-läsaren hittas inte?', style: Theme.of(context).textTheme.titleSmall),
+                          const SizedBox(height: 8),
+                          const Text('• Kontrollera att läsaren är ansluten till en USB-port'),
+                          const Text('• Prova en annan USB-port'),
+                          const Text('• Koppla ur och koppla in läsaren igen'),
+                          const Text('• Kontrollera att LED-lampan lyser på läsaren'),
+                          const Text('• macOS: Inga drivrutiner behövs (inbyggt stöd)'),
+                          const Text('• Windows: Inga extra drivrutiner behövs normalt'),
+                          const SizedBox(height: 12),
+                          Text('Kort-ID läses inte?', style: Theme.of(context).textTheme.titleSmall),
+                          const SizedBox(height: 8),
+                          const Text('• Lägg kortet plant på läsaren'),
+                          const Text('• Håll kortet stilla en sekund'),
+                          const Text('• Kontrollera att kortet är ISO 14443 (MIFARE/NFC)'),
+                          const Text('• Prova med ett annat kort'),
+                          const SizedBox(height: 12),
+                        ],
                         if (NfcReaderService.isNfcSupported) ...[
                           Text('NFC fungerar inte?', style: Theme.of(context).textTheme.titleSmall),
                           const SizedBox(height: 8),
                           const Text('• Kontrollera att NFC är aktiverat i inställningar'),
                           const Text('• Håll kortet stilla mot telefonens baksida'),
                           const Text('• Prova att ta bort telefonskalet'),
-                          const Text('• Stöder kortet NFC? (13.56 MHz IC-kort)'),
                           const SizedBox(height: 12),
                         ],
-                        Text('BLE-läsaren hittas inte?', style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
-                        const Text('• Starta om NFC-läsaren (koppla ur och in USB)'),
-                        const Text('• Flytta närmare läsaren (1-2 meter)'),
-                        const Text('• Koppla från andra Bluetooth-enheter'),
-                        const Text('• Aktivera Plats/GPS (Android)'),
-                        const Text('• Prova att ansluta till "Unknown Device"'),
-                        const SizedBox(height: 12),
-                        Text('Kort-ID visas inte?', style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
-                        const Text('• Anslut läsaren till datorns USB-port (inte bara laddare)'),
-                        const Text('• Klicka i textfältet ovan och skanna ett kort'),
-                        const Text('• Testa i Anteckningar först — skannar kortet text?'),
-                        const Text('• Prova med en annan typ av kort'),
-                        const Text('• Lägg inte läsaren på metallyta'),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-
-              // Scan button
-              FilledButton.icon(
-                onPressed: isScanning.value || state == BleReaderState.connecting ? null : startScan,
-                icon: isScanning.value
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : const Icon(Icons.bluetooth_searching),
-                label: Text(isScanning.value ? 'Söker...' : 'Sök efter BLE-läsare'),
-              ),
-              const SizedBox(height: 16),
-
-              // Error display
-              if (error.value != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(error.value!, style: const TextStyle(color: Colors.red)),
-                ),
-
-              // Results list
-              Text('Enheter i närheten', style: Theme.of(context).textTheme.titleSmall),
-              if (scanResults.value.isNotEmpty && !isScanning.value)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    'Tips: Din NFC-läsare kan visas som "Unknown Device". Prova att ansluta till enheter med stark signal (RSSI > -70 dBm)',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600], fontStyle: FontStyle.italic),
-                  ),
-                ),
-              const Divider(),
-              ...scanResults.value.map((result) {
-                final device = result.device;
-                final isConnected =
-                    state == BleReaderState.connected &&
-                    bleService.connectedDevice?.remoteId == device.remoteId;
-
-                final signalColor = result.rssi > -60
-                    ? Colors.green
-                    : result.rssi > -75
-                    ? Colors.orange
-                    : Colors.red;
-
-                return ListTile(
-                  leading: Icon(Icons.bluetooth, color: isConnected ? Colors.blue : signalColor),
-                  title: Text(
-                    device.platformName.isNotEmpty ? device.platformName : 'Unknown Device',
-                    style: device.platformName.isEmpty
-                        ? TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic)
-                        : null,
-                  ),
-                  subtitle: Text('${device.remoteId}\nSignal: ${result.rssi} dBm'),
-                  isThreeLine: true,
-                  trailing: isConnected
-                      ? const Chip(label: Text('Ansluten'))
-                      : state == BleReaderState.connecting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : null,
-                  onTap: isConnected || state == BleReaderState.connecting
-                      ? null
-                      : () => connectToDevice(device),
-                );
-              }),
-              if (scanResults.value.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Text(
-                    isScanning.value ? 'Söker...' : 'Tryck på "Sök efter BLE-läsare" för att hitta enheter',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
             ],
           ),
         ),
@@ -376,46 +367,32 @@ class ReaderSetupPage extends CompositionWidget {
     };
   }
 
-  static Color _stateColor(BleReaderState state) {
+  static Color _usbStateColor(UsbReaderState state) {
     switch (state) {
-      case BleReaderState.connected:
+      case UsbReaderState.connected:
+      case UsbReaderState.polling:
         return Colors.green;
-      case BleReaderState.connecting:
-      case BleReaderState.scanning:
+      case UsbReaderState.connecting:
         return Colors.orange;
-      case BleReaderState.error:
+      case UsbReaderState.error:
         return Colors.red;
-      case BleReaderState.disconnected:
+      case UsbReaderState.disconnected:
         return Colors.grey;
     }
   }
 
-  static IconData _stateIcon(BleReaderState state) {
+  static String _usbStateLabel(UsbReaderState state) {
     switch (state) {
-      case BleReaderState.connected:
-        return Icons.bluetooth_connected;
-      case BleReaderState.connecting:
-      case BleReaderState.scanning:
-        return Icons.bluetooth_searching;
-      case BleReaderState.error:
-        return Icons.bluetooth_disabled;
-      case BleReaderState.disconnected:
-        return Icons.bluetooth;
-    }
-  }
-
-  static String _stateLabel(BleReaderState state) {
-    switch (state) {
-      case BleReaderState.connected:
-        return 'BLE-läsare ansluten';
-      case BleReaderState.connecting:
+      case UsbReaderState.polling:
+        return 'USB-läsare aktiv';
+      case UsbReaderState.connected:
+        return 'USB-läsare ansluten';
+      case UsbReaderState.connecting:
         return 'Ansluter...';
-      case BleReaderState.scanning:
-        return 'Söker...';
-      case BleReaderState.error:
-        return 'Anslutningsfel';
-      case BleReaderState.disconnected:
-        return 'Ingen BLE-läsare ansluten';
+      case UsbReaderState.error:
+        return 'USB-läsarfel';
+      case UsbReaderState.disconnected:
+        return 'Ingen USB-läsare ansluten';
     }
   }
 }

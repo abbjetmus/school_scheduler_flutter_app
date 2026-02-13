@@ -29,7 +29,8 @@ class LoginPage extends CompositionWidget {
       }
     }
 
-    // Email/password login (commented dout for now)
+    // Email/password login (commented out for now)
+    // ignore: unused_element
     Future<void> handleLogin() async {
       if (!formKey.currentState!.validate()) return;
       errorMessage.value = null;
