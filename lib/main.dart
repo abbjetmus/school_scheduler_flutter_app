@@ -4,6 +4,7 @@ import 'package:flutter_compositions/flutter_compositions.dart';
 import 'features/attendance/repositories/attendance_repository.dart';
 import 'features/attendance/services/nfc_reader_service.dart';
 import 'features/attendance/services/usb_reader_service.dart';
+import 'features/attendance/services/attendance_api_service.dart';
 import 'features/attendance/services/attendance_queue_service.dart';
 import 'features/auth/auth_store.dart' as app_auth;
 import 'features/calendar/calendar_store.dart';
@@ -38,11 +39,16 @@ class AppRoot extends CompositionWidget {
     final authStore = app_auth.AuthStore(pb);
 
     // Existing attendance services
+    final nfcService = NfcReaderService();
+    final usbService = UsbReaderService();
+    final attendanceApiService = AttendanceApiService(usbService, nfcService);
+
     provide(pocketBaseKey, pb);
-    provide(nfcReaderServiceKey, NfcReaderService());
-    provide(usbReaderServiceKey, UsbReaderService());
+    provide(nfcReaderServiceKey, nfcService);
+    provide(usbReaderServiceKey, usbService);
     provide(attendanceRepositoryKey, attendanceRepo);
     provide(attendanceQueueServiceKey, AttendanceQueueService(attendanceRepo));
+    provide(attendanceApiServiceKey, attendanceApiService);
 
     // Feature stores
     provide(authStoreKey, authStore);
@@ -58,6 +64,9 @@ class AppRoot extends CompositionWidget {
 
     // Set global auth store for router guard
     setGlobalAuthStore(authStore);
+
+    // Start listening for card scans to register attendance
+    attendanceApiService.start();
 
     final router = createAppRouter();
 

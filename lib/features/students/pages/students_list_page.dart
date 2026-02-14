@@ -18,6 +18,7 @@ class StudentsListPage extends CompositionWidget {
     final classesStore = inject(classesStoreKey);
     final nfcService = inject(nfcReaderServiceKey);
     final usbService = inject(usbReaderServiceKey);
+    final attendanceApiService = inject(attendanceApiServiceKey);
     final contextRef = useContext();
 
     final currentPage = ref(1);
@@ -42,6 +43,9 @@ class StudentsListPage extends CompositionWidget {
       final emailController = TextEditingController(text: student?.email ?? '');
       final cardIdController = TextEditingController(text: student?.cardId ?? '');
       String? selectedClassId = student?.classId;
+
+      // Suppress attendance API calls while dialog is open
+      attendanceApiService.suppressAttendance = true;
 
       // Subscribe to card reader streams while dialog is open
       final usbSub = usbService.cardIdStream.listen((cardId) {
@@ -105,6 +109,7 @@ class StudentsListPage extends CompositionWidget {
                 onPressed: () {
                   usbSub.cancel();
                   nfcSub.cancel();
+                  attendanceApiService.suppressAttendance = false;
                   Navigator.of(dialogContext).pop();
                 },
                 child: const Text('Avbryt'),
@@ -127,6 +132,7 @@ class StudentsListPage extends CompositionWidget {
 
                   usbSub.cancel();
                   nfcSub.cancel();
+                  attendanceApiService.suppressAttendance = false;
 
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
@@ -230,7 +236,11 @@ class StudentsListPage extends CompositionWidget {
                       return ListTile(
                         title: Text(student.name),
                         subtitle: Text(
-                          '${student.email ?? ''}${studentClass != null ? ' • ${studentClass.name ?? ''}' : ''}',
+                          [
+                            if (student.email != null && student.email!.isNotEmpty) student.email!,
+                            if (studentClass != null) studentClass.name ?? '',
+                            if (student.cardId != null && student.cardId!.isNotEmpty) 'Kort: ${student.cardId!}',
+                          ].join(' • '),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,

@@ -14,7 +14,9 @@ class SettingsPage extends CompositionWidget {
   @override
   Widget Function(BuildContext) setup() {
     final settingsStore = inject(settingsStoreKey);
+    final attendanceApiService = inject(attendanceApiServiceKey);
     final showToken = ref(false);
+    final soundEnabled = ref(attendanceApiService.soundEnabled);
     final (tokenController, _, __) = useTextEditingController();
 
     // Default sync dates: current week Monday 00:00 to Sunday 23:59
@@ -66,6 +68,19 @@ class SettingsPage extends CompositionWidget {
               settingsStore,
               tokenController,
               showToken,
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: SwitchListTile(
+                title: const Text('Ljud vid närvaroregistrering'),
+                subtitle: const Text('Spela upp ljud vid incheckning, utcheckning och fel'),
+                secondary: const Icon(Icons.volume_up),
+                value: soundEnabled.value,
+                onChanged: (value) {
+                  soundEnabled.value = value;
+                  attendanceApiService.soundEnabled = value;
+                },
+              ),
             ),
             const SizedBox(height: 16),
             _buildCalendarSyncCard(

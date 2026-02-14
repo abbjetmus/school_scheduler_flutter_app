@@ -1,6 +1,7 @@
 import 'package:flutter_compositions/flutter_compositions.dart';
 import 'package:pocketbase/pocketbase.dart';
 import '../../features/attendance/services/nfc_reader_service.dart';
+import '../../features/attendance/services/attendance_api_service.dart';
 import '../../features/attendance/services/attendance_queue_service.dart';
 import '../../features/attendance/services/usb_reader_service.dart';
 import '../../features/attendance/repositories/attendance_repository.dart';
@@ -24,6 +25,9 @@ final attendanceRepositoryKey = InjectionKey<AttendanceRepository>(
 );
 final attendanceQueueServiceKey = InjectionKey<AttendanceQueueService>(
   'attendanceQueueService',
+);
+final attendanceApiServiceKey = InjectionKey<AttendanceApiService>(
+  'attendanceApiService',
 );
 
 // Feature Store Keys

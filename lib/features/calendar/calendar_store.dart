@@ -10,13 +10,7 @@ class StudentAttendance {
   final String? checkedOutAt;
   final int? lateMinutes;
 
-  StudentAttendance({
-    required this.id,
-    required this.name,
-    this.checkedInAt,
-    this.checkedOutAt,
-    this.lateMinutes,
-  });
+  StudentAttendance({required this.id, required this.name, this.checkedInAt, this.checkedOutAt, this.lateMinutes});
 }
 
 class CalendarStore {
@@ -41,19 +35,32 @@ class CalendarStore {
   ) async {
     _loading.value = true;
     try {
-      final extraInfoFilter =
-          extraInfoValues.map((val) => 'extraInfo = "$val"').join(' || ');
+      final extraInfoFilter = extraInfoValues.map((val) => 'extraInfo = "$val"').join(' || ');
       final dateFilter = 'start >= "$startDateTime" && end <= "$endDateTime"';
       final fullFilter = '($extraInfoFilter) && $dateFilter';
+
+      debugPrint('CalendarStore: extraInfoValues = $extraInfoValues');
+      debugPrint('CalendarStore: startDateTime = $startDateTime');
+      debugPrint('CalendarStore: endDateTime = $endDateTime');
+      debugPrint('CalendarStore: fullFilter = $fullFilter');
 
       final records = await _pb
           .collection(Collections.haldorCalendarEvents)
           .getFullList(filter: fullFilter, sort: 'start');
 
-      final events =
-          records.map((r) => HaldorCalendarEvent.fromRecord(r)).toList();
+      debugPrint('CalendarStore: fetched ${records.length} records from PocketBase');
+      for (final r in records) {
+        debugPrint(
+          'CalendarStore: event id=${r.id}, start=${r.data['start']}, end=${r.data['end']}, extraInfo=${r.data['extraInfo']}, subjectCode=${r.data['subjectCode']}',
+        );
+      }
+
+      final events = records.map((r) => HaldorCalendarEvent.fromRecord(r)).toList();
       _haldorEvents.value = events;
       _showCalendarView.value = true;
+
+      debugPrint('CalendarStore: _haldorEvents.value now has ${_haldorEvents.value.length} events');
+
       return events;
     } catch (e) {
       debugPrint('CalendarStore: Error fetching Haldor events: $e');
@@ -75,11 +82,8 @@ class CalendarStore {
         return [];
       }
 
-      final studentFilter =
-          attendance.map((id) => 'haldorStudentId = "$id"').join(' || ');
-      final studentRecords = await _pb
-          .collection(Collections.students)
-          .getFullList(filter: studentFilter);
+      final studentFilter = attendance.map((id) => 'haldorStudentId = "$id"').join(' || ');
+      final studentRecords = await _pb.collection(Collections.students).getFullList(filter: studentFilter);
 
       final registrationRecords = await _pb
           .collection(Collections.registrations)
@@ -101,9 +105,7 @@ class CalendarStore {
         if (reg?.checkedInAt != null && eventStart != null) {
           final checkedIn = DateTime.tryParse(reg!.checkedInAt!);
           if (checkedIn != null) {
-            final diffMs =
-                checkedIn.millisecondsSinceEpoch -
-                eventStart.millisecondsSinceEpoch;
+            final diffMs = checkedIn.millisecondsSinceEpoch - eventStart.millisecondsSinceEpoch;
             lateMinutes = (diffMs / 60000).floor();
             if (lateMinutes < 0) lateMinutes = 0;
           }
