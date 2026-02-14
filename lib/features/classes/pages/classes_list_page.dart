@@ -14,80 +14,114 @@ class ClassesListPage extends CompositionWidget {
   Widget Function(BuildContext) setup() {
     final classesStore = inject(classesStoreKey);
     final authStore = inject(authStoreKey);
+    final searchQuery = ref('');
+
+    final filteredClasses = computed(() {
+      final query = searchQuery.value.toLowerCase();
+      if (query.isEmpty) return classesStore.classes.value;
+      return classesStore.classes.value
+          .where((c) =>
+              (c.name ?? '').toLowerCase().contains(query) ||
+              c.extraInfo.any((info) => info.toLowerCase().contains(query)))
+          .toList();
+    });
 
     onMounted(() {
       classesStore.getClasses();
     });
 
     return (context) {
-      final classes = classesStore.classes.value;
+      final classes = filteredClasses.value;
       final loading = classesStore.loading.value;
 
       return Scaffold(
         appBar: AppBar(
           title: const Text('Klasser'),
         ),
-        body: loading
-            ? const Center(child: CircularProgressIndicator())
-            : classes.isEmpty
-                ? const Center(
-                    child: Text('Inga klasser ännu'),
-                  )
-                : ListView.builder(
-                    itemCount: classes.length,
-                    itemBuilder: (context, index) {
-                      final classGroup = classes[index];
-                      return Card(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        child: ListTile(
-                          title: Text(classGroup.name ?? ''),
-                          subtitle: classGroup.extraInfo.isNotEmpty
-                              ? Wrap(
-                                  spacing: 8,
-                                  runSpacing: 4,
-                                  children: classGroup.extraInfo
-                                      .map((info) => Chip(
-                                            label: Text(info),
-                                            materialTapTargetSize:
-                                                MaterialTapTargetSize
-                                                    .shrinkWrap,
-                                          ))
-                                      .toList(),
-                                )
-                              : null,
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: () {
-                                  _showClassDialog(
-                                    context,
-                                    classesStore,
-                                    authStore,
-                                    classGroup: classGroup,
-                                  );
-                                },
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete),
-                                onPressed: () {
-                                  _showDeleteDialog(
-                                    context,
-                                    classesStore,
-                                    classGroup,
-                                  );
-                                },
-                              ),
-                            ],
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                decoration: const InputDecoration(
+                  labelText: 'Sök klasser',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  searchQuery.value = value;
+                },
+              ),
+            ),
+            Expanded(
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : classes.isEmpty
+                      ? Center(
+                          child: Text(
+                            searchQuery.value.isNotEmpty
+                                ? 'Inga klasser matchar sökningen'
+                                : 'Inga klasser ännu',
                           ),
+                        )
+                      : ListView.builder(
+                          itemCount: classes.length,
+                          itemBuilder: (context, index) {
+                            final classGroup = classes[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              child: ListTile(
+                                title: Text(classGroup.name ?? ''),
+                                subtitle: classGroup.extraInfo.isNotEmpty
+                                    ? Wrap(
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        children: classGroup.extraInfo
+                                            .map((info) => Chip(
+                                                  label: Text(info),
+                                                  materialTapTargetSize:
+                                                      MaterialTapTargetSize
+                                                          .shrinkWrap,
+                                                ))
+                                            .toList(),
+                                      )
+                                    : null,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit),
+                                      onPressed: () {
+                                        _showClassDialog(
+                                          context,
+                                          classesStore,
+                                          authStore,
+                                          classGroup: classGroup,
+                                        );
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete),
+                                      onPressed: () {
+                                        _showDeleteDialog(
+                                          context,
+                                          classesStore,
+                                          classGroup,
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
+            ),
+          ],
+        ),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
             _showClassDialog(context, classesStore, authStore);

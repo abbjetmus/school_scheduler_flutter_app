@@ -22,10 +22,7 @@ class DashboardPage extends CompositionWidget {
   Widget Function(BuildContext) setup() {
     return (context) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Dashboard'),
-          automaticallyImplyLeading: false,
-        ),
+        appBar: AppBar(title: const Text('Dashboard'), automaticallyImplyLeading: false),
         body: LayoutBuilder(
           builder: (context, constraints) {
             final crossAxisCount = constraints.maxWidth > 900 ? 6 : (constraints.maxWidth > 600 ? 5 : 4);
@@ -44,30 +41,10 @@ class DashboardPage extends CompositionWidget {
                   label: 'Haldor Kalender',
                   route: HaldorCalendarPage.path,
                 ),
-                _buildFeatureCard(
-                  context,
-                  icon: Icons.school,
-                  label: 'Elever',
-                  route: StudentsListPage.path,
-                ),
-                _buildFeatureCard(
-                  context,
-                  icon: Icons.class_,
-                  label: 'Klasser',
-                  route: ClassesListPage.path,
-                ),
-                _buildFeatureCard(
-                  context,
-                  icon: Icons.people,
-                  label: 'Användare',
-                  route: UsersListPage.path,
-                ),
-                _buildFeatureCard(
-                  context,
-                  icon: Icons.poll,
-                  label: 'Undersökningar',
-                  route: SurveysListPage.path,
-                ),
+                _buildFeatureCard(context, icon: Icons.school, label: 'Elever', route: StudentsListPage.path),
+                _buildFeatureCard(context, icon: Icons.class_, label: 'Klasser', route: ClassesListPage.path),
+                _buildFeatureCard(context, icon: Icons.people, label: 'Användare', route: UsersListPage.path),
+                _buildFeatureCard(context, icon: Icons.poll, label: 'Undersökningar', route: SurveysListPage.path),
                 _buildFeatureCard(
                   context,
                   icon: Icons.subscriptions,
@@ -98,12 +75,7 @@ class DashboardPage extends CompositionWidget {
                   label: 'Läsarinställning',
                   route: ReaderSetupPage.path,
                 ),
-                _buildFeatureCard(
-                  context,
-                  icon: Icons.settings,
-                  label: 'Inställningar',
-                  route: SettingsPage.path,
-                ),
+                _buildFeatureCard(context, icon: Icons.settings, label: 'Inställningar', route: SettingsPage.path),
               ],
             );
           },
@@ -131,11 +103,7 @@ class DashboardPage extends CompositionWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 40,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+              Icon(icon, size: 40, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 8),
               Flexible(
                 child: Text(

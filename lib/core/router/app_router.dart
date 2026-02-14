@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/attendance/pages/attendance_page.dart';
 import '../../features/attendance/pages/reader_setup_page.dart';
@@ -22,6 +23,9 @@ import '../../features/social_media/pages/social_media_links_page.dart';
 import '../../features/folders_and_files/pages/folders_and_files_page.dart';
 import 'auth_guard.dart';
 
+Page<void> _noTransition(Widget child) =>
+    NoTransitionPage<void>(child: child);
+
 GoRouter createAppRouter() {
   return GoRouter(
     initialLocation: '/dashboard',
@@ -30,127 +34,127 @@ GoRouter createAppRouter() {
       // Auth routes (no shell)
       GoRoute(
         path: '/login',
-        builder: (context, state) => const LoginPage(),
+        pageBuilder: (context, state) => _noTransition(const LoginPage()),
       ),
       GoRoute(
         path: '/register',
-        builder: (context, state) => const RegisterPage(),
+        pageBuilder: (context, state) => _noTransition(const RegisterPage()),
       ),
       GoRoute(
         path: '/forgot-password',
-        builder: (context, state) => const ForgotPasswordPage(),
+        pageBuilder: (context, state) => _noTransition(const ForgotPasswordPage()),
       ),
       GoRoute(
         path: '/email-verification',
-        builder: (context, state) => EmailVerificationPage(
+        pageBuilder: (context, state) => _noTransition(EmailVerificationPage(
           token: state.uri.queryParameters['token'],
-        ),
+        )),
       ),
 
       // Authenticated routes
       GoRoute(
         path: '/dashboard',
-        builder: (context, state) => const DashboardPage(),
+        pageBuilder: (context, state) => _noTransition(const DashboardPage()),
       ),
       GoRoute(
         path: '/haldor-calendar',
-        builder: (context, state) => const HaldorCalendarPage(),
+        pageBuilder: (context, state) => _noTransition(const HaldorCalendarPage()),
       ),
 
       // Students
       GoRoute(
         path: '/students',
-        builder: (context, state) => const StudentsListPage(),
+        pageBuilder: (context, state) => _noTransition(const StudentsListPage()),
       ),
       GoRoute(
         path: '/import-students',
-        builder: (context, state) => const ImportStudentsPage(),
+        pageBuilder: (context, state) => _noTransition(const ImportStudentsPage()),
       ),
       GoRoute(
         path: '/import-haldor-ids',
-        builder: (context, state) => const ImportHaldorIdsPage(),
+        pageBuilder: (context, state) => _noTransition(const ImportHaldorIdsPage()),
       ),
 
       // Classes
       GoRoute(
         path: '/classes',
-        builder: (context, state) => const ClassesListPage(),
+        pageBuilder: (context, state) => _noTransition(const ClassesListPage()),
       ),
       GoRoute(
         path: '/import-classes',
-        builder: (context, state) => const ImportClassesPage(),
+        pageBuilder: (context, state) => _noTransition(const ImportClassesPage()),
       ),
 
       // Surveys
       GoRoute(
         path: '/surveys',
-        builder: (context, state) => const SurveysListPage(),
+        pageBuilder: (context, state) => _noTransition(const SurveysListPage()),
       ),
       GoRoute(
         path: '/create-survey',
-        builder: (context, state) => const CreateSurveyPage(),
+        pageBuilder: (context, state) => _noTransition(const CreateSurveyPage()),
       ),
       GoRoute(
         path: '/edit-survey/:id',
-        builder: (context, state) => CreateSurveyPage(
+        pageBuilder: (context, state) => _noTransition(CreateSurveyPage(
           surveyId: state.pathParameters['id'],
-        ),
+        )),
       ),
 
       // Subscriptions
       GoRoute(
         path: '/subscriptions',
-        builder: (context, state) => const SubscriptionsListPage(),
+        pageBuilder: (context, state) => _noTransition(const SubscriptionsListPage()),
       ),
       GoRoute(
         path: '/create-subscription',
-        builder: (context, state) => const CreateSubscriptionPage(),
+        pageBuilder: (context, state) => _noTransition(const CreateSubscriptionPage()),
       ),
       GoRoute(
         path: '/edit-subscription/:id',
-        builder: (context, state) => CreateSubscriptionPage(
+        pageBuilder: (context, state) => _noTransition(CreateSubscriptionPage(
           subscriptionId: state.pathParameters['id'],
-        ),
+        )),
       ),
 
       // Users
       GoRoute(
         path: '/users',
-        builder: (context, state) => const UsersListPage(),
+        pageBuilder: (context, state) => _noTransition(const UsersListPage()),
       ),
 
       // Settings
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsPage(),
+        pageBuilder: (context, state) => _noTransition(const SettingsPage()),
       ),
 
       // Social Media
       GoRoute(
         path: '/social-media-links',
-        builder: (context, state) => const SocialMediaLinksPage(),
+        pageBuilder: (context, state) => _noTransition(const SocialMediaLinksPage()),
       ),
 
       // Folders & Files
       GoRoute(
         path: '/folders-and-files',
-        builder: (context, state) => const FoldersAndFilesPage(),
+        pageBuilder: (context, state) => _noTransition(const FoldersAndFilesPage()),
       ),
       GoRoute(
         path: '/folders-and-files/:id',
-        builder: (context, state) => FoldersAndFilesPage(
+        pageBuilder: (context, state) => _noTransition(FoldersAndFilesPage(
           folderId: state.pathParameters['id'],
-        ),
+        )),
       ),
 
       // Attendance
       GoRoute(
         path: '/',
-        builder: (context, state) => const AttendancePage(),
+        pageBuilder: (context, state) => _noTransition(const AttendancePage()),
       ),
       GoRoute(
         path: '/reader-setup',
-        builder: (context, state) => const ReaderSetupPage(),
+        pageBuilder: (context, state) => _noTransition(const ReaderSetupPage()),
       ),
     ],
   );
