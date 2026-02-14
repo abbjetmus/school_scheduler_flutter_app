@@ -183,6 +183,7 @@ class HaldorCalendarPage extends CompositionWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: SfCalendar(
                   view: calendarView.value,
+                  firstDayOfWeek: 1, // Monday
                   dataSource: _HaldorEventDataSource(haldorEvents),
                   monthViewSettings: const MonthViewSettings(
                     appointmentDisplayMode: MonthAppointmentDisplayMode.appointment,

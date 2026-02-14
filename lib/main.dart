@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
 import 'features/attendance/repositories/attendance_repository.dart';
 import 'features/attendance/services/nfc_reader_service.dart';
@@ -63,6 +64,13 @@ class AppRoot extends CompositionWidget {
     return (context) => MaterialApp.router(
       title: 'School Scheduler',
       routerConfig: router,
+      locale: const Locale('sv'),
+      supportedLocales: const [Locale('sv')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue), useMaterial3: true),
     );
   }

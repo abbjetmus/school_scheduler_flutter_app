@@ -15,6 +15,7 @@ class Collections {
   static const String subscriptionCronJobs = 'subscriptionCronJobs';
   static const String subscriptionPages = 'subscriptionPages';
   static const String surveyPages = 'surveyPages';
+  static const String tokens = 'tokens';
   static const String users = 'users';
 }
 
@@ -315,6 +316,43 @@ class User extends BaseModel {
       haldorUserId: record.data['haldorUserId'] as String?,
       verified: record.data['verified'] as bool? ?? false,
       emailVisibility: record.data['emailVisibility'] as bool? ?? false,
+      record: record,
+    );
+  }
+}
+
+// --- Token ---
+
+class Token extends BaseModel {
+  final String token;
+  final String refreshToken;
+  final String schoolId;
+  final String? tokenService;
+
+  Token({
+    required super.id,
+    required super.created,
+    required super.updated,
+    required super.collectionId,
+    required super.collectionName,
+    required this.token,
+    required this.refreshToken,
+    required this.schoolId,
+    this.tokenService,
+    super.record,
+  });
+
+  factory Token.fromRecord(RecordModel record) {
+    return Token(
+      id: record.id,
+      created: record.getStringValue('created'),
+      updated: record.getStringValue('updated'),
+      collectionId: record.collectionId,
+      collectionName: record.collectionName,
+      token: record.data['token'] as String? ?? '',
+      refreshToken: record.data['refreshToken'] as String? ?? '',
+      schoolId: record.data['school'] as String? ?? '',
+      tokenService: record.data['tokenService'] as String?,
       record: record,
     );
   }
