@@ -68,6 +68,24 @@ class AppRoot extends CompositionWidget {
     // Start listening for card scans to register attendance
     attendanceApiService.start();
 
+    // Auto-initialize USB reader at app startup so card scans work on any page
+    onMounted(() async {
+      if (UsbReaderService.isSupported) {
+        debugPrint('AppRoot: Initializing USB reader...');
+        await usbService.initialize();
+        final readers = await usbService.listReaders();
+        debugPrint('AppRoot: Found ${readers.length} USB reader(s): $readers');
+        if (readers.length == 1) {
+          debugPrint('AppRoot: Auto-connecting to ${readers.first}');
+          await usbService.connectToReader(readers.first);
+        }
+      }
+      if (NfcReaderService.isNfcSupported) {
+        debugPrint('AppRoot: Starting NFC session...');
+        nfcService.startSession();
+      }
+    });
+
     final router = createAppRouter();
 
     return (context) => MaterialApp.router(

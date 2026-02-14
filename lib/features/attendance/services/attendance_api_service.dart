@@ -45,7 +45,14 @@ class AttendanceApiService {
     debugPrint('AttendanceApiService: soundEnabled = $value');
   }
 
-  AttendanceApiService(this._usbService, this._nfcService);
+  AttendanceApiService(this._usbService, this._nfcService) {
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      debugPrint('AttendanceApiService: AudioPlayer state changed to $state');
+    });
+    _audioPlayer.eventStream.listen((event) {
+      debugPrint('AttendanceApiService: AudioPlayer event: ${event.eventType}');
+    });
+  }
 
   void start() {
     _loadSoundPreference();
@@ -91,21 +98,39 @@ class AttendanceApiService {
     }
   }
 
-  void _playSound(int status) {
-    if (!_soundEnabled) return;
-
-    final String asset;
-    switch (status) {
-      case 1:
-        asset = 'assets/dog.mp3';
-      case 2:
-        asset = 'assets/cat.mp3';
-      default:
-        asset = 'assets/goat.mp3';
+  Future<void> _playSound(int status) async {
+    if (!_soundEnabled) {
+      debugPrint('AttendanceApiService: Sound disabled, skipping');
+      return;
     }
 
-    debugPrint('AttendanceApiService: Playing sound $asset');
-    _audioPlayer.play(AssetSource(asset.replaceFirst('assets/', '')));
+    final String assetName;
+    switch (status) {
+      case 1:
+        assetName = 'dog.mp3';
+      case 2:
+        assetName = 'cat.mp3';
+      default:
+        assetName = 'goat.mp3';
+    }
+
+    debugPrint('AttendanceApiService: Playing sound $assetName for status=$status');
+    debugPrint('AttendanceApiService: AudioPlayer state=${_audioPlayer.state}');
+    debugPrint('AttendanceApiService: AudioPlayer source=AssetSource($assetName)');
+
+    try {
+      await _audioPlayer.stop();
+      debugPrint('AttendanceApiService: Stopped previous playback');
+
+      await _audioPlayer.setSource(AssetSource(assetName));
+      debugPrint('AttendanceApiService: Source set successfully');
+
+      await _audioPlayer.resume();
+      debugPrint('AttendanceApiService: Playback started, state=${_audioPlayer.state}');
+    } catch (e, stackTrace) {
+      debugPrint('AttendanceApiService: ERROR playing sound: $e');
+      debugPrint('AttendanceApiService: Stack trace: $stackTrace');
+    }
   }
 
   Future<void> _loadSoundPreference() async {
