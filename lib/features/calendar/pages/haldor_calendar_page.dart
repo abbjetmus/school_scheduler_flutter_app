@@ -114,7 +114,7 @@ class HaldorCalendarPage extends CompositionWidget {
                     const SizedBox(height: 16),
 
                     // Fetch button
-                    ElevatedButton(
+                    FilledButton(
                       onPressed: selectedClass.value == null || loading
                           ? null
                           : () {

@@ -75,6 +75,7 @@ flutter:
     - assets/goat.mp3
     - assets/dog.mp3
     - assets/cat.mp3
+    - assets/login_bg.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

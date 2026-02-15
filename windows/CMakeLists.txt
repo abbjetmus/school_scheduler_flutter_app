@@ -4,7 +4,7 @@ project(school_scheduler_flutter_app LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "skolpunkten")
+set(BINARY_NAME "school_scheduler_flutter_app")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -57,6 +57,12 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Rename the output executable to "skolpunkten.exe" in Release/Profile builds only.
+# Debug keeps the original name so flutter run can find it.
+set_target_properties(${BINARY_NAME} PROPERTIES
+  OUTPUT_NAME_RELEASE "skolpunkten"
+  OUTPUT_NAME_PROFILE "skolpunkten"
+)
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
