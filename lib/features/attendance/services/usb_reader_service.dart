@@ -94,8 +94,14 @@ class UsbReaderService {
   Future<void> _pollLoop(String readerName) async {
     debugPrint('USB-PCSC: Polling for cards on $readerName...');
     bool cardWasPresent = false;
+    bool uidReadSuccess = false;
+    int pollCount = 0;
 
     while (_polling && _context != null) {
+      pollCount++;
+      if (pollCount % 60 == 1) {
+        debugPrint('USB-PCSC: Poll heartbeat #$pollCount');
+      }
       try {
         // Try to connect — succeeds only if a card is present
         final card = await _context!.connect(
@@ -105,58 +111,64 @@ class UsbReaderService {
         );
 
         if (!cardWasPresent) {
-          // New card detected — read UID
+          debugPrint('USB-PCSC: Card detected');
           cardWasPresent = true;
-          await _readCardUidFromCard(card);
+          uidReadSuccess = false;
+        }
+
+        if (!uidReadSuccess) {
+          // Try to read UID (retry on each poll if previous read failed)
+          uidReadSuccess = await _readCardUidFromCard(card);
+          if (!uidReadSuccess) {
+            debugPrint('USB-PCSC: UID read failed, will retry on next poll');
+          }
         }
 
         await card.disconnect(Disposition.leaveCard);
-        // Card still present, wait before checking again
         await Future.delayed(const Duration(milliseconds: 300));
-      } catch (_) {
+      } catch (e) {
         // No card present (connect failed)
         if (cardWasPresent) {
           debugPrint('USB-PCSC: Card removed');
           cardWasPresent = false;
+          uidReadSuccess = false;
         }
-        // Wait before next poll attempt
         await Future.delayed(const Duration(milliseconds: 500));
       }
     }
+    debugPrint('USB-PCSC: Poll loop EXITED! _polling=$_polling');
   }
 
-  /// Read the UID from an already-connected card.
-  Future<void> _readCardUidFromCard(Card card) async {
+  /// Read the UID from an already-connected card. Returns true on success.
+  Future<bool> _readCardUidFromCard(Card card) async {
     try {
       // APDU: Get UID (FF CA 00 00 00)
-      // FF = class (pseudo-APDU for reader)
-      // CA = instruction (Get Data / Get UID)
-      // 00 00 = P1 P2
-      // 00 = Le (return all available bytes)
       final getUidCommand = Uint8List.fromList([0xFF, 0xCA, 0x00, 0x00, 0x00]);
       final response = await card.transmit(getUidCommand);
 
       if (response.length >= 2) {
-        // Last 2 bytes are status word (SW1 SW2)
         final sw1 = response[response.length - 2];
         final sw2 = response[response.length - 1];
 
         if (sw1 == 0x90 && sw2 == 0x00) {
-          // Success — UID is everything except the last 2 bytes
           final uidBytes = response.sublist(0, response.length - 2);
           final uid = _bytesToHex(uidBytes);
           debugPrint('USB-PCSC: Card UID: $uid');
           _emitCardId(uid);
+          return true;
         } else {
           debugPrint(
             'USB-PCSC: Get UID failed with SW: '
             '${sw1.toRadixString(16).padLeft(2, '0')} '
             '${sw2.toRadixString(16).padLeft(2, '0')}',
           );
+          return false;
         }
       }
+      return false;
     } catch (e) {
       debugPrint('USB-PCSC: Error reading card UID: $e');
+      return false;
     }
   }
 

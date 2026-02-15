@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "se.skolpunkten" "\0"
-            VALUE "FileDescription", "school_scheduler_flutter_app" "\0"
+            VALUE "FileDescription", "Skolpunkten" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "school_scheduler_flutter_app" "\0"
+            VALUE "InternalName", "skolpunkten" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 se.skolpunkten. All rights reserved." "\0"
-            VALUE "OriginalFilename", "school_scheduler_flutter_app.exe" "\0"
-            VALUE "ProductName", "school_scheduler_flutter_app" "\0"
+            VALUE "OriginalFilename", "skolpunkten.exe" "\0"
+            VALUE "ProductName", "Skolpunkten" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

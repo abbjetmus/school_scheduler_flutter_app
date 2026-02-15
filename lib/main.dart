@@ -89,7 +89,7 @@ class AppRoot extends CompositionWidget {
     final router = createAppRouter();
 
     return (context) => MaterialApp.router(
-      title: 'School Scheduler',
+      title: 'Skolpunkten',
       routerConfig: router,
       locale: const Locale('sv'),
       supportedLocales: const [Locale('sv')],

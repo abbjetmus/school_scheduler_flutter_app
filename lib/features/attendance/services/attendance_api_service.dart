@@ -78,21 +78,31 @@ class AttendanceApiService {
   }
 
   Future<void> _registerAttendance(String cardId) async {
-    debugPrint('AttendanceApiService: Registering attendance for cardId=$cardId');
+    final url = '$_baseUrl$_endpoint';
+    final requestBody = jsonEncode({'cardId': cardId});
+    debugPrint('AttendanceApiService: === REGISTER ATTENDANCE ===');
+    debugPrint('AttendanceApiService: URL: $url');
+    debugPrint('AttendanceApiService: Request body: $requestBody');
+    debugPrint('AttendanceApiService: cardId=$cardId');
     try {
       final response = await http.post(
-        Uri.parse('$_baseUrl$_endpoint'),
+        Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'cardId': cardId}),
+        body: requestBody,
       );
 
+      debugPrint('AttendanceApiService: HTTP ${response.statusCode}');
+      debugPrint('AttendanceApiService: Response headers: ${response.headers}');
+      debugPrint('AttendanceApiService: Response body: "${response.body}"');
+
       final status = int.tryParse(response.body) ?? 0;
-      debugPrint('AttendanceApiService: Response status=$status for cardId=$cardId');
+      debugPrint('AttendanceApiService: Parsed status=$status (0=error, 1=check-in, 2=check-out)');
 
       _playSound(status);
       _resultController.add(AttendanceApiResult(cardId: cardId, status: status));
-    } catch (e) {
-      debugPrint('AttendanceApiService: Error registering attendance: $e');
+    } catch (e, stackTrace) {
+      debugPrint('AttendanceApiService: ERROR calling API: $e');
+      debugPrint('AttendanceApiService: Stack trace: $stackTrace');
       _playSound(0);
       _resultController.add(AttendanceApiResult(cardId: cardId, status: 0));
     }
