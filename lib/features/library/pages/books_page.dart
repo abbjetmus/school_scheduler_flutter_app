@@ -107,7 +107,7 @@ class BooksPage extends CompositionWidget {
               return;
             case ScannedCard(:final person):
               hub.playError();
-              toast('Det där är ${person.name}s lånekort, inte en bok.', error: true);
+              toast('Det där är ${person.name}s passerkort, inte en bok.', error: true);
               return;
             case ScannedUnknown():
               hub.playError();

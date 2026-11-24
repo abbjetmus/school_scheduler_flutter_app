@@ -3,13 +3,14 @@
 Windows-appen som står i skolbiblioteket. En lärare loggar in en gång. Sedan
 lånar och lämnar elever och lärare böcker genom att **blippa**:
 
-1. Blippa **lånekortet** — personen blir låntagare och ser sina lån.
+1. Blippa boken. Skärmen visar en QR-kod som eleven skannar med mobilen för att låna —
+   eller blippa elevens **passerkort** först (kopplas under Kort/Blipp).
 2. Blippa **böckerna** — en bok som finns lånas ut, en bok som är utlånad lämnas tillbaka.
 3. Efter en stund utan blipp (45 s, går att ändra) släpps låntagaren.
 
 Böckerna läggs in i Skolpunkten på webben (Bibliotek → Böcker: ISBN-uppslag,
 kamera, CSV-import). I appen kopplas RFID-etiketter till exemplaren
-(Böcker) och kort till personer (Lånekort). Allt sparas i Skolpunkten
+(Böcker) och passerkort till elever och lärare (Kort/Blipp). Allt sparas i Skolpunkten
 (school-scheduler-pb, collections `libraryTitles`, `libraryCopies`,
 `libraryLoans`, `userCards`); utlåningen går via `/api/library/*`.
 
@@ -23,7 +24,7 @@ se `docs/NFC_READER.md`) fungerar direkt. Den skriver kortets nummer som ett
 tangentbord och trycker Enter, via USB-kabel eller Bluetooth. Appen fångar det
 utan inställningar ("Läsare som skriver som ett tangentbord" är på som standard).
 
-- **Lånekort:** elevernas kort (13,56 MHz MIFARE eller 125 kHz) läses som förut.
+- **Passerkort (Kort/Blipp):** elevernas och lärarnas passerkort (13,56 MHz MIFARE eller 125 kHz) läses som förut i närvarosystemet (`cardId`).
 - **Böcker:** läsaren klarar enligt specen MIFARE-/IC-kort, inte ISO 15693
   (NXP ICODE), som vanliga biblioteksetiketter är. Appen använder bara
   etikettens nummer (UID), så etiketten behöver inte vara en biblioteksetikett:

@@ -12,7 +12,7 @@ import '../circulation_store.dart';
 import '../library_models.dart';
 import '../widgets/person_search_dialog.dart';
 
-/// Utlåningen — det som står på skärmen i biblioteket. Blippa ett lånekort
+/// Utlåningen — det som står på skärmen i biblioteket. Blippa ett passerkort
 /// och sedan böckerna; en utlånad bok som blippas lämnas tillbaka.
 class CirculationPage extends CompositionWidget {
   const CirculationPage({super.key});
@@ -271,14 +271,14 @@ class _PendingCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              'Har du ett lånekort? Blippa det i stället.',
+              'Har du ett kopplat passerkort? Blippa det i stället.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.ink3, fontSize: 13),
             ),
           ] else
             const Padding(
               padding: EdgeInsets.only(top: 8),
-              child: Text('Blippa ditt lånekort för att låna boken.', style: TextStyle(color: AppColors.onSunLight)),
+              child: Text('Blippa ditt passerkort för att låna boken.', style: TextStyle(color: AppColors.onSunLight)),
             ),
           const SizedBox(height: 14),
           Row(
@@ -328,8 +328,8 @@ class _BorrowerCard extends StatelessWidget {
           children: [
             Text(
               onChoose != null
-                  ? 'Blippa boken så visas en QR-kod som eleven skannar med mobilen. Har eleven ett lånekort kan du blippa det, eller välja eleven i listan.'
-                  : 'Blippa boken så visas en QR-kod som du skannar med mobilen. Har du ett lånekort kan du blippa det först.',
+                  ? 'Blippa boken så visas en QR-kod som eleven skannar med mobilen. Har eleven ett kopplat passerkort kan du blippa det, eller välja eleven i listan.'
+                  : 'Blippa boken så visas en QR-kod som du skannar med mobilen. Har du ett kopplat passerkort kan du blippa det först.',
               style: const TextStyle(color: AppColors.ink2, height: 1.4),
             ),
             if (onChoose != null) ...[

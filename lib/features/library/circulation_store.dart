@@ -45,12 +45,12 @@ String formatDue(DateTime? date) => date == null ? '' : _date.format(date);
 /// Utlåningen vid bibliotekets dator.
 ///
 /// Flödet är byggt för att man bara ska behöva blippa:
-///  - Ett **lånekort** gör personen till låntagare. Personens lån visas.
+///  - Ett **passerkort** (kopplat under Kort/Blipp) gör personen till låntagare. Personens lån visas.
 ///  - En **bok som är utlånad** lämnas tillbaka — oavsett vem som har den.
 ///  - En **bok som finns** lånas ut till låntagaren. Finns ingen låntagare
 ///    visas en QR-kod: eleven skannar den med mobilen (inloggad i Skolpunkten)
 ///    och lånar där. Koden gäller två minuter och bara här, så lånet görs på
-///    plats. Ett lånekort som blippas under tiden lånar direkt i stället.
+///    plats. Ett passerkort som blippas under tiden lånar direkt i stället.
 ///  - Ett **ISBN** (bokens streckkod, för böcker utan egen etikett) fungerar
 ///    som en bok: första lediga exemplaret lånas ut, och har låntagaren boken
 ///    lämnas den tillbaka.
@@ -254,7 +254,7 @@ class CirculationStore {
             _log(
               EventKind.error,
               'Alla exemplar av ${title.title} är utlånade',
-              'Ska boken lämnas tillbaka? Blippa lånekortet först, eller blippa bokens RFID-etikett.',
+              'Ska boken lämnas tillbaka? Blippa passerkortet först, eller blippa bokens RFID-etikett.',
             );
           }
         case ScannedUnknown(:final isbn):
@@ -263,7 +263,7 @@ class CirculationStore {
             isbn.isNotEmpty ? 'Boken finns inte i biblioteket' : 'Okänd kod',
             isbn.isNotEmpty
                 ? 'ISBN $isbn är inte inlagt. Lägg till boken i Skolpunkten under Bibliotek → Böcker.'
-                : 'Koden ${result.code} är inte kopplad till någon bok eller något lånekort. Koppla den under Böcker eller Lånekort.',
+                : 'Koden ${result.code} är inte kopplad till någon bok eller något passerkort. Koppla den under Böcker eller Kort/Blipp.',
           );
       }
     } on LibraryException catch (e) {
@@ -289,14 +289,14 @@ class CirculationStore {
       );
       _log(EventKind.info, title, 'Skanna QR-koden med mobilen för att låna boken.');
     } on LibraryException catch (e) {
-      // Utan QR-kod går det fortfarande att blippa ett lånekort.
+      // Utan QR-kod går det fortfarande att blippa ett passerkort.
       pending.value = PendingCopy(
         copyId: copyId,
         title: title,
         location: location,
         deadline: DateTime.now().add(Duration(seconds: _hub.sessionTimeoutSeconds)),
       );
-      _log(EventKind.error, 'Ingen QR-kod', '${e.message} Blippa ditt lånekort för att låna boken.');
+      _log(EventKind.error, 'Ingen QR-kod', '${e.message} Blippa ditt passerkort för att låna boken.');
     }
     _poll = Timer.periodic(const Duration(milliseconds: 1500), (_) => _checkPending());
   }

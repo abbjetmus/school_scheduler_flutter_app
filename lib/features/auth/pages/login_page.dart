@@ -45,7 +45,7 @@ class LoginPage extends CompositionWidget {
                       Text('Skolpunkten Bibliotek', textAlign: TextAlign.center, style: pageTitleStyle(context).copyWith(fontSize: 26)),
                       const SizedBox(height: 8),
                       const Text(
-                        'Logga in med ett lärar- eller adminkonto. Sedan lånar elever och lärare genom att blippa böcker och lånekort.',
+                        'Logga in med ett lärar- eller adminkonto. Sedan lånar elever och lärare genom att blippa böcker och passerkort.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: AppColors.ink2, fontSize: 15, height: 1.4),
                       ),

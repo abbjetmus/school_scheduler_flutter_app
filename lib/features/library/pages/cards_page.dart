@@ -10,7 +10,7 @@ import '../library_api.dart';
 import '../library_models.dart';
 import '../widgets/person_search_dialog.dart';
 
-/// Lånekort: välj en person och blippa kortet. Ett kort per person — ett nytt
+/// Kort/Blipp: koppla en elevs eller lärares passerkort — välj personen och blippa kortet. Ett kort per person — ett nytt
 /// kort ersätter det gamla. Blippas ett kort utan att någon är vald visas vems
 /// det är.
 class CardsPage extends CompositionWidget {
@@ -112,8 +112,8 @@ class CardsPage extends CompositionWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const PageHeader(
-                title: 'Lånekort',
-                subtitle: 'Elev- eller passerkort som man blippar för att låna. Ett kort per person.',
+                title: 'Kort/Blipp',
+                subtitle: 'Koppla elevernas och lärarnas passerkort till personen. Ett kort per person.',
               ),
               Expanded(
                 child: Row(
@@ -122,7 +122,7 @@ class CardsPage extends CompositionWidget {
                     SizedBox(
                       width: 400,
                       child: SectionCard(
-                        title: 'Koppla ett kort',
+                        title: 'Koppla ett passerkort',
                         icon: Icons.badge_outlined,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,

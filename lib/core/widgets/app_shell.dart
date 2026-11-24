@@ -20,7 +20,7 @@ const _nav = [
   _NavItem('/', 'Utlåning', Icons.contactless_outlined),
   _NavItem('/loans', 'Lån', Icons.swap_horiz),
   _NavItem('/books', 'Böcker', Icons.menu_book_outlined),
-  _NavItem('/cards', 'Lånekort', Icons.badge_outlined),
+  _NavItem('/cards', 'Kort/Blipp', Icons.badge_outlined),
   _NavItem('/settings', 'Inställningar', Icons.settings_outlined),
 ];
 
