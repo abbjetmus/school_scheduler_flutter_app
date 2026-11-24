@@ -27,6 +27,8 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   kiosk_ = std::make_unique<KioskMode>(
       GetHandle(), flutter_controller_->engine()->messenger());
+  sound_ = std::make_unique<SoundChannel>(
+      flutter_controller_->engine()->messenger());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -43,6 +45,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   kiosk_ = nullptr;
+  sound_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

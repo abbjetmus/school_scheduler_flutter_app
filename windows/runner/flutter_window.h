@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "kiosk_mode.h"
+#include "sound_channel.h"
 #include "win32_window.h"
 
 // A window that does nothing but host a Flutter view.
@@ -32,6 +33,9 @@ class FlutterWindow : public Win32Window {
 
   // Kioskläget (helskärm, låst tangentbord) — se kiosk_mode.h.
   std::unique_ptr<KioskMode> kiosk_;
+
+  // Pipljuden vid utlåning — se sound_channel.h.
+  std::unique_ptr<SoundChannel> sound_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

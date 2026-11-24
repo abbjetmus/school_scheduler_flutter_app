@@ -22,7 +22,6 @@ dependencies:
   # PC/SC-läsare (USB) i Windows — t.ex. ACR1552U som läser både bibliotekets
   # RFID-etiketter (ISO 15693) och passerkort (ISO 14443).
   dart_pcsc: ^2.0.2
-  audioplayers: ^6.1.0
   google_fonts: ^6.2.1
   crypto: ^3.0.6
 

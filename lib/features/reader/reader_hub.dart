@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'keyboard_reader_service.dart';
@@ -27,7 +27,8 @@ class ReaderHub {
   final _codeController = StreamController<String>.broadcast();
   late final StreamSubscription<String> _pcscSub;
   late final StreamSubscription<String> _keyboardSub;
-  AudioPlayer? _player;
+  /// Ljuden spelas av Windows-delen (windows/runner/sound_channel.cpp).
+  static const _sound = MethodChannel('skolpunkten/sound');
 
   Stream<String> get codes => _codeController.stream;
 
@@ -84,9 +85,9 @@ class ReaderHub {
   Future<void> _play(String name) async {
     if (!soundsEnabled) return;
     try {
-      final player = _player ??= AudioPlayer();
-      await player.stop();
-      await player.play(AssetSource('sounds/$name.wav'));
+      await _sound.invokeMethod<bool>('play', name);
+    } on MissingPluginException {
+      // Inte Windows-runnern (t.ex. i tester).
     } catch (e) {
       debugPrint('Ljud: $e');
     }
@@ -102,7 +103,6 @@ class ReaderHub {
   void dispose() {
     _pcscSub.cancel();
     _keyboardSub.cancel();
-    _player?.dispose();
     keyboard.dispose();
     pcsc.dispose();
     _codeController.close();
