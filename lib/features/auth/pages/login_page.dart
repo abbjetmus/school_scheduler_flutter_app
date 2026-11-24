@@ -1,211 +1,154 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
-import 'package:go_router/go_router.dart';
-import '../../../core/di/injection_keys.dart';
 
+import '../../../core/di/injection_keys.dart';
+import '../../../core/theme/app_theme.dart';
+
+/// Inloggning — som i webben: Microsoft eller Google, inga lösenord.
 class LoginPage extends CompositionWidget {
   const LoginPage({super.key});
 
   @override
   Widget Function(BuildContext) setup() {
-    final authStore = inject(authStoreKey);
-    final errorMessage = ref<String?>(null);
-    final contextRef = useContext();
+    final auth = inject(authStoreKey);
+    final error = ref<String?>(null);
 
-    Future<void> handleMicrosoftLogin() async {
-      errorMessage.value = null;
-      try {
-        await authStore.signInWithMicrosoft();
-        final ctx = contextRef.value;
-        if (ctx != null && ctx.mounted) {
-          ctx.go('/dashboard');
-        }
-      } catch (e) {
-        errorMessage.value = 'Microsoft-inloggning misslyckades: $e';
-      }
+    Future<void> signIn(String provider) async {
+      error.value = null;
+      error.value = await auth.signIn(provider);
     }
 
     return (context) {
+      final busy = auth.signingIn.value;
       return Scaffold(
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Background image
-            Image.asset(
-              'assets/login_bg.jpg',
-              fit: BoxFit.cover,
-            ),
-            // Dark overlay
-            Container(
-              color: Colors.black.withValues(alpha: 0.5),
-            ),
-            // Content
-            SafeArea(
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 36, 32, 32),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 48),
-                        child: Text(
-                          'SKOLPUNKTEN',
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 2,
-                          ),
+                      Center(
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(16)),
+                          child: const Icon(Icons.local_library_outlined, color: Colors.white, size: 32),
                         ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text('Skolpunkten Bibliotek', textAlign: TextAlign.center, style: pageTitleStyle(context).copyWith(fontSize: 26)),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Logga in med ett lärar- eller adminkonto. Sedan lånar elever och lärare genom att blippa böcker och lånekort.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.ink2, fontSize: 15, height: 1.4),
+                      ),
+                      const SizedBox(height: 28),
+                      if (error.value != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.errorLight,
+                            borderRadius: BorderRadius.circular(AppRadius.tile),
+                          ),
+                          child: Text(error.value!, style: const TextStyle(color: AppColors.error)),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      _ProviderButton(
+                        label: 'Logga in med Microsoft',
+                        logo: const _MicrosoftLogo(),
+                        loading: busy == 'microsoft',
+                        disabled: busy != null,
+                        onPressed: () => signIn('microsoft'),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Appen som samlar funktionalitet\nfor skola, pa en punkt!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w300,
-                          color: Colors.white,
-                          height: 1.4,
-                        ),
+                      _ProviderButton(
+                        label: 'Logga in med Google',
+                        logo: const Text('G',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF4285F4))),
+                        loading: busy == 'google',
+                        disabled: busy != null,
+                        onPressed: () => signIn('google'),
                       ),
-                      const SizedBox(height: 48),
-
-                      // Error message
-                      if (errorMessage.value != null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          constraints: const BoxConstraints(maxWidth: 500),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade900.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error, color: Colors.white),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  errorMessage.value!,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
+                      if (busy != null) ...[
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Slutför inloggningen i webbläsaren och kom sedan tillbaka hit.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.ink3),
                         ),
-
-                      // Microsoft login button
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 500),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: authStore.loading.value
-                                ? null
-                                : handleMicrosoftLogin,
-                            icon: authStore.loading.value
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.black54,
-                                    ),
-                                  )
-                                : const Icon(Icons.login, color: Colors.black87),
-                            label: const Text(
-                              'Logga in med Microsoft',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black87,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 48),
-
-                      // Feature cards
-                      _buildFeatureCards(),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
       );
     };
   }
+}
 
-  static Widget _buildFeatureCards() {
-    const features = [
-      (
-        title: 'Bygga formulor och gora undersokningar',
-        icon: Icons.description,
-      ),
-      (
-        title: 'SMS och e-post paminnelser infor t.ex. oppet hus',
-        icon: Icons.notifications,
-      ),
-      (
-        title: 'Emoji-undersokningar',
-        icon: Icons.mood,
-      ),
-      (
-        title: 'Kom at undersokningar via QR-koder',
-        icon: Icons.qr_code,
-      ),
-    ];
+class _ProviderButton extends StatelessWidget {
+  const _ProviderButton({
+    required this.label,
+    required this.logo,
+    required this.loading,
+    required this.disabled,
+    required this.onPressed,
+  });
 
-    return IntrinsicHeight(
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        alignment: WrapAlignment.center,
-        children: features.map((feature) {
-          return SizedBox(
-            width: 200,
-            height: 140,
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(feature.icon, size: 48, color: Colors.blue.shade300),
-                  const SizedBox(height: 8),
-                  Text(
-                    feature.title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+  final String label;
+  final Widget logo;
+  final bool loading;
+  final bool disabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: OutlinedButton(
+        onPressed: disabled ? null : onPressed,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (loading)
+              const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+            else
+              SizedBox(width: 20, height: 20, child: Center(child: logo)),
+            const SizedBox(width: 12),
+            Text(label),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MicrosoftLogo extends StatelessWidget {
+  const _MicrosoftLogo();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget square(int color) => Container(width: 8, height: 8, color: Color(color));
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [square(0xFFF25022), square(0xFF7FBA00)]),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [square(0xFF00A4EF), square(0xFFFFB900)]),
+        ],
       ),
     );
   }

@@ -1,0 +1,129 @@
+# Bygger Skolpunkten Bibliotek för Windows.
+#
+#  - Push till main (ändringar i appen) och manuell körning (Actions → Build
+#    Windows → Run workflow): installationsprogram och zip som artefakt
+#    under körningen (sparas i 30 dagar).
+#  - Tagg v* (t.ex. `git tag v1.0.1 && git push origin v1.0.1`): samma filer
+#    som en GitHub-release, där de går att hämta så länge releasen finns.
+#
+# Version: taggen (v1.0.1 → 1.0.1), annars versionen i pubspec.yaml.
+# Byggnumret är körningens nummer.
+
+name: Build Windows
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'lib/**'
+      - 'windows/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/build-windows.yml'
+  workflow_dispatch:
+    inputs:
+      pb_url:
+        description: 'PocketBase-adress (tomt = produktion)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.41.5'
+          cache: true
+
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}".TrimStart('v')
+          } else {
+            $line = Select-String -Path pubspec.yaml -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)' | Select-Object -First 1
+            $version = $line.Matches[0].Groups[1].Value
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Version $version (bygge ${{ github.run_number }})"
+
+      - name: Paket
+        run: flutter pub get
+
+      - name: Analys
+        run: flutter analyze --no-fatal-infos
+
+      - name: Bygg
+        shell: pwsh
+        run: |
+          $flutterArgs = @('build', 'windows', '--release',
+            "--build-name=${{ steps.version.outputs.version }}",
+            "--build-number=${{ github.run_number }}")
+          $pb = "${{ github.event.inputs.pb_url }}"
+          if ($pb) { $flutterArgs += "--dart-define=PB_URL=$pb" }
+          flutter @flutterArgs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Lägg med Visual C++-runtime
+        # Flutter-appar behöver msvcp140/vcruntime140. De finns oftast redan,
+        # men en nyinstallerad skoldator kan sakna dem — lägg dem bredvid exe:n.
+        shell: pwsh
+        run: |
+          $release = 'build\windows\x64\runner\Release'
+          foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+            Copy-Item "$env:WINDIR\System32\$dll" $release
+          }
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path 'build\windows\x64\runner\Release\*' `
+            -DestinationPath "dist\Skolpunkten-Bibliotek-${{ steps.version.outputs.version }}.zip"
+
+      - name: Installationsprogram
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc `
+            "/DAppVersion=${{ steps.version.outputs.version }}" `
+            "/DSourceDir=$PWD\build\windows\x64\runner\Release" `
+            "/DOutputDir=$PWD\dist" `
+            windows\installer\skolpunkten-bibliotek.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Skolpunkten-Bibliotek-${{ steps.version.outputs.version }}-${{ github.run_number }}
+          path: dist/*
+          retention-days: 30
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Skolpunkten Bibliotek ${{ steps.version.outputs.version }}
+          files: dist/*
+          body: |
+            **Installera:** hämta `Skolpunkten-Bibliotek-setup-${{ steps.version.outputs.version }}.exe` och kör den som administratör.
+            Windows kan varna ("Windows skyddade datorn") eftersom programmet inte är signerat — välj *Mer information → Kör ändå*.
+
+            Zip-filen innehåller samma program utan installation.

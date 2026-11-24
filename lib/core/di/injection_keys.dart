@@ -1,58 +1,15 @@
 import 'package:flutter_compositions/flutter_compositions.dart';
-import 'package:pocketbase/pocketbase.dart';
-import '../../features/attendance/services/nfc_reader_service.dart';
-import '../../features/attendance/services/attendance_api_service.dart';
-import '../../features/attendance/services/attendance_queue_service.dart';
-import '../../features/attendance/services/usb_reader_service.dart';
-import '../../features/attendance/repositories/attendance_repository.dart';
-import '../../features/auth/auth_store.dart' as app_auth;
-import '../../features/calendar/calendar_store.dart';
-import '../../features/students/students_store.dart';
-import '../../features/classes/classes_store.dart';
-import '../../features/surveys/surveys_store.dart';
-import '../../features/subscriptions/subscriptions_store.dart';
-import '../../features/users/users_store.dart';
-import '../../features/settings/settings_store.dart';
-import '../../features/social_media/social_media_store.dart';
-import '../../features/folders_and_files/folders_and_files_store.dart';
+import 'package:pocketbase/pocketbase.dart' show PocketBase;
 
-// Global Dependency Injection Keys
+import '../../features/auth/auth_store.dart';
+import '../../features/kiosk/kiosk_store.dart';
+import '../../features/library/circulation_store.dart';
+import '../../features/library/library_api.dart';
+import '../../features/reader/reader_hub.dart';
+
 final pocketBaseKey = InjectionKey<PocketBase>('pocketBase');
-final nfcReaderServiceKey = InjectionKey<NfcReaderService>('nfcReaderService');
-final usbReaderServiceKey = InjectionKey<UsbReaderService>('usbReaderService');
-final attendanceRepositoryKey = InjectionKey<AttendanceRepository>(
-  'attendanceRepository',
-);
-final attendanceQueueServiceKey = InjectionKey<AttendanceQueueService>(
-  'attendanceQueueService',
-);
-final attendanceApiServiceKey = InjectionKey<AttendanceApiService>(
-  'attendanceApiService',
-);
-
-// Feature Store Keys
-final authStoreKey = InjectionKey<app_auth.AuthStore>('authStore');
-final calendarStoreKey = InjectionKey<CalendarStore>('calendarStore');
-final studentsStoreKey = InjectionKey<StudentsStore>('studentsStore');
-final classesStoreKey = InjectionKey<ClassesStore>('classesStore');
-final surveysStoreKey = InjectionKey<SurveysStore>('surveysStore');
-final subscriptionsStoreKey = InjectionKey<SubscriptionsStore>(
-  'subscriptionsStore',
-);
-final usersStoreKey = InjectionKey<UsersStore>('usersStore');
-final settingsStoreKey = InjectionKey<SettingsStore>('settingsStore');
-final socialMediaStoreKey = InjectionKey<SocialMediaStore>('socialMediaStore');
-final foldersAndFilesStoreKey = InjectionKey<FoldersAndFilesStore>(
-  'foldersAndFilesStore',
-);
-
-// Global AuthStore reference for router guard
-app_auth.AuthStore? _globalAuthStore;
-
-void setGlobalAuthStore(app_auth.AuthStore store) {
-  _globalAuthStore = store;
-}
-
-app_auth.AuthStore? getGlobalAuthStore() {
-  return _globalAuthStore;
-}
+final authStoreKey = InjectionKey<AuthStore>('authStore');
+final libraryApiKey = InjectionKey<LibraryApi>('libraryApi');
+final readerHubKey = InjectionKey<ReaderHub>('readerHub');
+final circulationStoreKey = InjectionKey<CirculationStore>('circulationStore');
+final kioskStoreKey = InjectionKey<KioskStore>('kioskStore');
