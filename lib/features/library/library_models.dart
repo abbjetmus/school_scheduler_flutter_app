@@ -177,6 +177,13 @@ class LibraryLoan {
 
   bool get isOverdue => returnedAt == null && dueAt != null && dueAt!.isBefore(DateTime.now());
 
+  /// Förläng visas när det är högst en vecka kvar (eller lånet är försenat) —
+  /// en förlängning direkt efter lånet ändrar inget. Servern avgör till sist.
+  bool canRenew(int maxRenewals) =>
+      returnedAt == null &&
+      renewals < maxRenewals &&
+      (dueAt == null || dueAt!.difference(DateTime.now()).inDays <= 7);
+
   /// Svar från /api/library/*.
   factory LibraryLoan.fromJson(Map<String, dynamic> json) => LibraryLoan(
         id: _s(json['id']),
@@ -209,6 +216,26 @@ class LibraryLoan {
       renewals: (json['renewals'] as num?)?.toInt() ?? 0,
     );
   }
+}
+
+/// QR-kod för lån med mobilen — /api/library/kiosk-sessions.
+/// status: open, used (lånad med koden), expired, unavailable (lånad på annat sätt).
+class KioskSessionInfo {
+  KioskSessionInfo({required this.token, required this.url, required this.status, this.expiresAt, this.loan});
+
+  final String token;
+  final String url;
+  final String status;
+  final DateTime? expiresAt;
+  final LibraryLoan? loan;
+
+  factory KioskSessionInfo.fromJson(Map<String, dynamic> json) => KioskSessionInfo(
+        token: _s(json['token']),
+        url: _s(json['url']),
+        status: _s(json['status']),
+        expiresAt: parsePbDate(_s(json['expiresAt'])),
+        loan: json['loan'] is Map ? LibraryLoan.fromJson(_map(json['loan'])) : null,
+      );
 }
 
 /// Vad en blippad eller skannad kod är — GET /api/library/scan.

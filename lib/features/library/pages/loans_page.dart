@@ -156,7 +156,7 @@ class LoansPage extends CompositionWidget {
                                               ? StatusPill.error('Försenad ${formatDue(loan.dueAt)}')
                                               : StatusPill('Åter ${formatDue(loan.dueAt)}'),
                                           const SizedBox(width: 12),
-                                          if (loan.renewals < auth.maxRenewals.value) ...[
+                                          if (loan.canRenew(auth.maxRenewals.value)) ...[
                                             TextButton(
                                               onPressed: busy.value == null ? () => renew(loan) : null,
                                               child: const Text('Förläng'),

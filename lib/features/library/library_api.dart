@@ -74,6 +74,21 @@ class LibraryApi {
         return LibraryLoan.fromJson(json);
       }, 'Kunde inte låna ut boken.');
 
+  /// QR-kod för ett ledigt exemplar — eleven lånar genom att skanna den med mobilen.
+  Future<KioskSessionInfo> createKioskSession(String copyId) => _call(() async {
+        final json = await _pb.send<Map<String, dynamic>>(
+          '/api/library/kiosk-sessions',
+          method: 'POST',
+          body: {'copy': copyId},
+        );
+        return KioskSessionInfo.fromJson(json);
+      }, 'Kunde inte skapa QR-koden.');
+
+  Future<KioskSessionInfo> kioskSession(String token) => _call(() async {
+        final json = await _pb.send<Map<String, dynamic>>('/api/library/kiosk-sessions/$token');
+        return KioskSessionInfo.fromJson(json);
+      }, 'Kunde inte läsa QR-koden.');
+
   /// Förlänger lånet (ny återlämningsdag = i dag + skolans lånetid).
   Future<LibraryLoan> renew(String loanId) => _call(() async {
         final json = await _pb.send<Map<String, dynamic>>(

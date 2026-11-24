@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_compositions/flutter_compositions.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/di/injection_keys.dart';
 import '../../../core/theme/app_theme.dart';
@@ -31,7 +32,7 @@ class CirculationPage extends CompositionWidget {
     Timer? ticker;
     onMounted(() {
       sub = hub.codes.listen(store.handleCode);
-      ticker = Timer.periodic(const Duration(seconds: 5), (_) => tick.value++);
+      ticker = Timer.periodic(const Duration(seconds: 1), (_) => tick.value++);
     });
     onUnmounted(() {
       sub?.cancel();
@@ -65,7 +66,7 @@ class CirculationPage extends CompositionWidget {
           children: [
             PageHeader(
               title: 'Utlåning',
-              subtitle: 'Blippa ditt lånekort och sedan böckerna. En utlånad bok som blippas lämnas tillbaka.',
+              subtitle: 'Blippa boken och skanna QR-koden med mobilen för att låna. En utlånad bok som blippas lämnas tillbaka.',
               actions: [
                 if (manual)
                   OutlinedButton.icon(
@@ -170,12 +171,12 @@ class _ScanHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  fresh ? event.title : 'Blippa en bok eller ditt lånekort',
+                  fresh ? event.title : 'Blippa boken',
                   style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: fresh ? fg : AppColors.ink, height: 1.15),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  fresh ? event.detail : 'Lägg boken eller kortet på läsaren.',
+                  fresh ? event.detail : 'Lägg boken på läsaren för att låna eller lämna tillbaka.',
                   style: const TextStyle(fontSize: 18, color: AppColors.ink2, height: 1.35),
                 ),
               ],
@@ -232,18 +233,56 @@ class _PendingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final url = pending.qrUrl;
+    final left = pending.deadline.difference(DateTime.now()).inSeconds.clamp(0, 999);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(color: AppColors.sunLight, borderRadius: BorderRadius.circular(AppRadius.card)),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('VÄNTAR PÅ LÅNTAGARE', style: sectionLabelStyle(context).copyWith(color: AppColors.onSunLight)),
+          Text(
+            url != null ? 'SKANNA MED MOBILEN FÖR ATT LÅNA' : 'VÄNTAR PÅ LÅNTAGARE',
+            style: sectionLabelStyle(context).copyWith(color: AppColors.onSunLight),
+          ),
           const SizedBox(height: 6),
           Text(pending.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           if (pending.location.isNotEmpty) Text(pending.location, style: const TextStyle(color: AppColors.ink2)),
+          if (url != null) ...[
+            const SizedBox(height: 14),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.tile)),
+                child: QrImageView(
+                  data: url,
+                  size: 240,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: AppColors.ink),
+                  dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: AppColors.ink),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Logga in i Skolpunkten på mobilen om du inte redan är det. Koden gäller i $left s.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.onSunLight),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Har du ett lånekort? Blippa det i stället.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.ink3, fontSize: 13),
+            ),
+          ] else
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('Blippa ditt lånekort för att låna boken.', style: TextStyle(color: AppColors.onSunLight)),
+            ),
           const SizedBox(height: 14),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (onChoose != null) ...[
                 FilledButton(onPressed: onChoose, child: const Text('Välj låntagare')),
@@ -289,8 +328,8 @@ class _BorrowerCard extends StatelessWidget {
           children: [
             Text(
               onChoose != null
-                  ? 'Blippa lånekortet. Har eleven inget kort kan du välja eleven i listan.'
-                  : 'Blippa ditt lånekort. Har du inget kort? Låna i Skolpunkten på webben eller fråga personalen.',
+                  ? 'Blippa boken så visas en QR-kod som eleven skannar med mobilen. Har eleven ett lånekort kan du blippa det, eller välja eleven i listan.'
+                  : 'Blippa boken så visas en QR-kod som du skannar med mobilen. Har du ett lånekort kan du blippa det först.',
               style: const TextStyle(color: AppColors.ink2, height: 1.4),
             ),
             if (onChoose != null) ...[
@@ -343,7 +382,7 @@ class _BorrowerCard extends StatelessWidget {
                       ),
                     ),
                     if (loan.isOverdue) StatusPill.error('Försenad'),
-                    if (loan.renewals < maxRenewals)
+                    if (loan.canRenew(maxRenewals))
                       TextButton(onPressed: () => onRenew(loan), child: const Text('Förläng')),
                   ],
                 ),

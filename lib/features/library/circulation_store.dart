@@ -19,10 +19,24 @@ class CirculationEvent {
 
 /// En bok som har blippats men väntar på en låntagare.
 class PendingCopy {
-  PendingCopy({required this.copyId, required this.title, required this.location});
+  PendingCopy({
+    required this.copyId,
+    required this.title,
+    required this.location,
+    required this.deadline,
+    this.token,
+    this.qrUrl,
+  });
   final String copyId;
   final String title;
   final String location;
+
+  /// När boken slutar vänta (QR-kodens giltighet).
+  final DateTime deadline;
+
+  /// QR-koden eleven skannar med mobilen (null om den inte gick att skapa).
+  final String? token;
+  final String? qrUrl;
 }
 
 final _date = DateFormat('d MMMM', 'sv');
@@ -33,8 +47,10 @@ String formatDue(DateTime? date) => date == null ? '' : _date.format(date);
 /// Flödet är byggt för att man bara ska behöva blippa:
 ///  - Ett **lånekort** gör personen till låntagare. Personens lån visas.
 ///  - En **bok som är utlånad** lämnas tillbaka — oavsett vem som har den.
-///  - En **bok som finns** lånas ut till låntagaren. Finns ingen låntagare än
-///    väntar boken tills ett kort blippas eller en låntagare väljs.
+///  - En **bok som finns** lånas ut till låntagaren. Finns ingen låntagare
+///    visas en QR-kod: eleven skannar den med mobilen (inloggad i Skolpunkten)
+///    och lånar där. Koden gäller två minuter och bara här, så lånet görs på
+///    plats. Ett lånekort som blippas under tiden lånar direkt i stället.
 ///  - Ett **ISBN** (bokens streckkod, för böcker utan egen etikett) fungerar
 ///    som en bok: första lediga exemplaret lånas ut, och har låntagaren boken
 ///    lämnas den tillbaka.
@@ -56,6 +72,8 @@ class CirculationStore {
   final secondsLeft = ref<int?>(null);
 
   Timer? _timer;
+  Timer? _poll;
+  bool _checking = false;
   final _queue = <String>[];
 
   CirculationEvent? get latest => events.value.isEmpty ? null : events.value.first;
@@ -78,9 +96,11 @@ class CirculationStore {
 
   // ── Session ───────────────────────────────────────────────────────────
 
+  /// Låntagarens nedräkning. En bok som väntar på QR-lån utan låntagare
+  /// hanteras av [_checkPending] (koden har egen giltighetstid).
   void _touch() {
     _timer?.cancel();
-    if (borrower.value == null && pending.value == null) {
+    if (borrower.value == null) {
       secondsLeft.value = null;
       return;
     }
@@ -97,6 +117,7 @@ class CirculationStore {
 
   void endSession() {
     _timer?.cancel();
+    _poll?.cancel();
     borrower.value = null;
     borrowerLoans.value = [];
     pending.value = null;
@@ -122,8 +143,54 @@ class CirculationStore {
   }
 
   void cancelPending() {
+    _poll?.cancel();
     pending.value = null;
     _touch();
+  }
+
+  /// Följer QR-koden: lånad med mobilen, utgången eller lånad på annat sätt.
+  Future<void> _checkPending() async {
+    final p = pending.value;
+    if (p == null) {
+      _poll?.cancel();
+      return;
+    }
+    if (_checking) return;
+    _checking = true;
+    try {
+      final token = p.token;
+      if (token == null) {
+        if (DateTime.now().isAfter(p.deadline)) {
+          _poll?.cancel();
+          pending.value = null;
+        }
+        return;
+      }
+      final session = await _api.kioskSession(token);
+      if (pending.value?.token != token) return;
+      switch (session.status) {
+        case 'used':
+          _poll?.cancel();
+          pending.value = null;
+          final loan = session.loan;
+          _log(
+            EventKind.lent,
+            '${p.title} är utlånad',
+            'Till ${loan?.borrower?.name ?? 'dig'}. Lämnas tillbaka senast ${formatDue(loan?.dueAt)}.',
+          );
+        case 'expired':
+          _poll?.cancel();
+          pending.value = null;
+          _log(EventKind.info, 'QR-koden gick ut', 'Blippa ${p.title} igen om du vill låna den.');
+        case 'unavailable':
+          _poll?.cancel();
+          pending.value = null;
+      }
+    } on LibraryException {
+      // Tillfälligt nätfel — försök igen vid nästa tick.
+    } finally {
+      _checking = false;
+    }
   }
 
   // ── Koder ─────────────────────────────────────────────────────────────
@@ -205,18 +272,39 @@ class CirculationStore {
   }
 
   Future<void> _lendOrWait(String copyId, String title, String location) async {
-    if (borrower.value == null) {
-      pending.value = PendingCopy(copyId: copyId, title: title, location: location);
-      _touch();
-      _log(EventKind.info, title, 'Blippa ditt lånekort för att låna boken.');
+    if (borrower.value != null) {
+      await _lend(copyId);
       return;
     }
-    await _lend(copyId);
+    _poll?.cancel();
+    try {
+      final session = await _api.createKioskSession(copyId);
+      pending.value = PendingCopy(
+        copyId: copyId,
+        title: title,
+        location: location,
+        deadline: session.expiresAt ?? DateTime.now().add(const Duration(minutes: 2)),
+        token: session.token,
+        qrUrl: session.url,
+      );
+      _log(EventKind.info, title, 'Skanna QR-koden med mobilen för att låna boken.');
+    } on LibraryException catch (e) {
+      // Utan QR-kod går det fortfarande att blippa ett lånekort.
+      pending.value = PendingCopy(
+        copyId: copyId,
+        title: title,
+        location: location,
+        deadline: DateTime.now().add(Duration(seconds: _hub.sessionTimeoutSeconds)),
+      );
+      _log(EventKind.error, 'Ingen QR-kod', '${e.message} Blippa ditt lånekort för att låna boken.');
+    }
+    _poll = Timer.periodic(const Duration(milliseconds: 1500), (_) => _checkPending());
   }
 
   Future<void> _lendPending() async {
     final p = pending.value;
     if (p == null || borrower.value == null) return;
+    _poll?.cancel();
     pending.value = null;
     await _lend(p.copyId);
   }
@@ -285,5 +373,8 @@ class CirculationStore {
     _touch();
   }
 
-  void dispose() => _timer?.cancel();
+  void dispose() {
+    _timer?.cancel();
+    _poll?.cancel();
+  }
 }
