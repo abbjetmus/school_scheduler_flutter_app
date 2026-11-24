@@ -17,7 +17,8 @@
 #endif
 
 #define AppName "Skolpunkten Bibliotek"
-#define AppExe "school_scheduler_flutter_app.exe"
+; Release-bygget döps om till skolpunkten.exe i windows/CMakeLists.txt.
+#define AppExe "skolpunkten.exe"
 
 [Setup]
 ; Fast AppId — samma för alla versioner, så att en ny version ersätter den gamla.

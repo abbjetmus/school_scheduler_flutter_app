@@ -91,7 +91,7 @@ Skolans datorer brukar ha Education.
    $sid = (Get-LocalUser -Name "bibliotek").SID.Value
    $ShellLauncher = [wmiclass]"\\localhost\root\standardcimv2\embedded:WESL_UserSetting"
    # 0 = starta om appen om den stängs
-   $ShellLauncher.SetCustomShell($sid, "C:\Program Files\Skolpunkten Bibliotek\school_scheduler_flutter_app.exe", ($null), ($null), 0)
+   $ShellLauncher.SetCustomShell($sid, "C:\Program Files\Skolpunkten Bibliotek\skolpunkten.exe", ($null), ($null), 0)
    $ShellLauncher.SetEnabled($true)
    ```
 
