@@ -11,6 +11,7 @@ import '../../../core/widgets/ui.dart';
 import '../circulation_store.dart';
 import '../library_api.dart';
 import '../library_models.dart';
+import '../widgets/add_book_dialog.dart';
 
 /// Vad nästa blippade etikett ska användas till.
 sealed class _TagTarget {
@@ -18,8 +19,17 @@ sealed class _TagTarget {
 }
 
 class _TagCopy extends _TagTarget {
-  const _TagCopy(this.copy);
+  const _TagCopy(this.copy, {this.queue = const [], this.position = 1, this.total = 1});
   final LibraryCopy copy;
+
+  /// Exemplar som väntar på etikett efter det här — när en ny bok lagts in
+  /// blippas exemplaren ett i taget.
+  final List<LibraryCopy> queue;
+  final int position;
+  final int total;
+
+  _TagCopy? get next =>
+      queue.isEmpty ? null : _TagCopy(queue.first, queue: queue.sublist(1), position: position + 1, total: total);
 }
 
 class _NewCopy extends _TagTarget {
@@ -27,7 +37,11 @@ class _NewCopy extends _TagTarget {
 }
 
 /// Böckerna — sök, se exemplaren och koppla RFID-etiketter genom att blippa.
-/// Nya böcker läggs in i Skolpunkten på webben (ISBN-uppslag, import).
+///
+/// Nya böcker läggs in genom att skanna streckkoden (ISBN) på baksidan med en
+/// streckkodsläsare, eller med "Lägg till bok". Uppgifterna hämtas från Libris
+/// och exemplaren får sina etiketter direkt efteråt. Import från Excel görs på
+/// webben.
 ///
 /// Blippar man en etikett när inget exemplar väntar på en visas boken den
 /// sitter på — bra för att ta reda på vad en bok är.
@@ -49,6 +63,8 @@ class BooksPage extends CompositionWidget {
     final target = ref<_TagTarget?>(null);
     final untaggedOnly = ref(false);
     final allCopies = ref<List<LibraryCopy>>([]);
+    // Dialogen "Lägg till bok" tar själv hand om det som skannas.
+    var dialogOpen = false;
 
     void toast(String message, {bool error = false}) {
       final ctx = contextRef.value;
@@ -81,14 +97,42 @@ class BooksPage extends CompositionWidget {
       }
     }
 
+    Future<void> addBook({String isbn = ''}) async {
+      final ctx = contextRef.value;
+      if (ctx == null || dialogOpen) return;
+      dialogOpen = true;
+      target.value = null;
+      final AddedBook? added;
+      try {
+        added = await showAddBookDialog(ctx, isbn: isbn, titles: titles.value);
+      } finally {
+        dialogOpen = false;
+      }
+      if (added == null) return;
+      final count = added.copies.length;
+      toast(count == 1
+          ? '${added.title.title} finns nu i biblioteket.'
+          : '${added.title.title} finns nu i biblioteket med $count exemplar.');
+      await select(added.title);
+      unawaited(loadTitles());
+      if (count > 0) {
+        target.value = _TagCopy(added.copies.first, queue: added.copies.sublist(1), total: count);
+      }
+    }
+
     Future<void> onCode(String code) async {
+      if (dialogOpen) return;
       final t = target.value;
       final title = selected.value;
+      _TagTarget? next;
       try {
         if (t is _TagCopy) {
           await api.setCopyRfid(t.copy.id, code);
           hub.playSuccess();
-          toast('Etiketten är kopplad till exemplaret${t.copy.location.isNotEmpty ? ' på ${t.copy.location}' : ''}.');
+          next = t.next;
+          toast(next != null
+              ? 'Etiketten är kopplad. Lägg nästa exemplar på läsaren.'
+              : 'Etiketten är kopplad till exemplaret${t.copy.location.isNotEmpty ? ' på ${t.copy.location}' : ''}.');
           target.value = null;
         } else if (t is _NewCopy && title != null) {
           final location = copies.value.where((c) => c.location.isNotEmpty).firstOrNull?.location ?? '';
@@ -109,6 +153,10 @@ class BooksPage extends CompositionWidget {
               hub.playError();
               toast('Det där är ${person.name}s passerkort, inte en bok.', error: true);
               return;
+            case ScannedUnknown(:final isbn) when isbn.isNotEmpty:
+              hub.playCard();
+              await addBook(isbn: isbn);
+              return;
             case ScannedUnknown():
               hub.playError();
               toast('Etiketten ${result.code} sitter inte på någon bok. Välj ett exemplar och tryck "Koppla etikett".',
@@ -117,6 +165,7 @@ class BooksPage extends CompositionWidget {
           }
         }
         if (title != null) await select(title);
+        if (next != null) target.value = next;
         unawaited(loadTitles());
       } on LibraryException catch (e) {
         hub.playError();
@@ -167,12 +216,17 @@ class BooksPage extends CompositionWidget {
             children: [
               PageHeader(
                 title: 'Böcker',
-                subtitle: 'Koppla RFID-etiketter till exemplaren. Nya böcker läggs in i Skolpunkten på webben.',
+                subtitle: 'Skanna streckkoden på en ny bok för att lägga in den. Koppla RFID-etiketter till exemplaren.',
                 actions: [
                   OutlinedButton.icon(
                     onPressed: () => launchUrl(Uri.parse('${PocketBaseClient.webUrl}/library/books')),
                     icon: const Icon(Icons.open_in_new),
-                    label: const Text('Lägg till böcker'),
+                    label: const Text('Importera på webben'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => addBook(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Lägg till bok'),
                   ),
                 ],
               ),
@@ -194,6 +248,12 @@ class BooksPage extends CompositionWidget {
                                   prefixIcon: Icon(Icons.search),
                                   isDense: true,
                                 ),
+                                // Skannas ett ISBN i sökfältet: visa boken, eller lägg in den.
+                                onSubmitted: (value) {
+                                  if (!isValidLibraryIsbn(value)) return;
+                                  searchController.clear();
+                                  onCode(value);
+                                },
                               ),
                             ),
                             CheckboxListTile(
@@ -241,7 +301,8 @@ class BooksPage extends CompositionWidget {
                               child: EmptyState(
                                 icon: Icons.contactless_outlined,
                                 title: 'Välj en bok — eller blippa en',
-                                text: 'Blippar du en bok visas vilken det är och var den ska stå.',
+                                text: 'Blippar du en bok visas vilken det är och var den ska stå. '
+                                    'Skannar du streckkoden på en bok som inte finns kan du lägga in den.',
                               ),
                             )
                           : _CopiesPanel(
@@ -324,7 +385,9 @@ class _CopiesPanel extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(
-                      t is _TagCopy
+                      t is _TagCopy && t.total > 1
+                          ? 'Blippa etiketten på exemplar ${t.position} av ${t.total}.'
+                          : t is _TagCopy
                           ? 'Blippa etiketten som sitter på exemplaret${t.copy.location.isNotEmpty ? ' på ${t.copy.location}' : ''}.'
                           : 'Blippa etiketten på det nya exemplaret.',
                       style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.onSunLight),

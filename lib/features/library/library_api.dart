@@ -149,6 +149,42 @@ class LibraryApi {
         return LibraryCopy.fromRecord(record);
       }, 'Kunde inte spara etiketten.');
 
+  /// Bokuppgifter för ett ISBN. null om ingen källa känner till boken.
+  Future<IsbnLookup?> lookupIsbn(String isbn) async {
+    try {
+      final json = await _pb.send<Map<String, dynamic>>('/api/library/isbn/${Uri.encodeComponent(isbn)}');
+      return IsbnLookup.fromJson(json);
+    } on ClientException catch (e) {
+      if (e.statusCode == 404) return null;
+      throw LibraryException(_message(e, 'Kunde inte hämta uppgifterna.'));
+    }
+  }
+
+  /// Ny bok i katalogen. Taggarna normaliseras av PocketBase.
+  Future<LibraryTitle> createTitle({
+    required String title,
+    String author = '',
+    String isbn = '',
+    String edition = '',
+    String publisher = '',
+    List<String> tags = const [],
+    String coverUrl = '',
+  }) =>
+      _call(() async {
+        final record = await _pb.collection('libraryTitles').create(body: {
+          'school': _school,
+          'createdBy': _pb.authStore.record?.id ?? '',
+          'title': title,
+          'author': author,
+          'isbn': isbn,
+          'edition': edition,
+          'publisher': publisher,
+          'tags': tags,
+          'coverUrl': coverUrl,
+        });
+        return LibraryTitle.fromRecord(record);
+      }, 'Kunde inte spara boken.');
+
   /// Nytt exemplar av en bok, valfritt med RFID-etikett.
   Future<LibraryCopy> addCopy(String titleId, {String location = '', String rfid = ''}) => _call(() async {
         final record = await _pb.collection('libraryCopies').create(body: {

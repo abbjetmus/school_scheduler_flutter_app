@@ -8,9 +8,12 @@ lånar och lämnar elever och lärare böcker genom att **blippa**:
 2. Blippa **böckerna** — en bok som finns lånas ut, en bok som är utlånad lämnas tillbaka.
 3. Efter en stund utan blipp (45 s, går att ändra) släpps låntagaren.
 
-Böckerna läggs in i Skolpunkten på webben (Bibliotek → Böcker: ISBN-uppslag,
-kamera, CSV-import). I appen kopplas RFID-etiketter till exemplaren
-(Böcker) och passerkort till elever och lärare (Kort/Blipp). Allt sparas i Skolpunkten
+Böckerna läggs in genom att skanna streckkoden (ISBN) på baksidan — under
+Böcker i appen (streckkodsläsare) eller i Skolpunkten på webben (Bibliotek →
+Böcker: streckkodsläsare, kamera, CSV-import). Uppgifterna hämtas från Libris.
+I appen kopplas sedan RFID-etiketter till exemplaren (Böcker), ett i taget
+direkt efter att boken lagts in, och passerkort till elever och lärare
+(Kort/Blipp). Allt sparas i Skolpunkten
 (school-scheduler-pb, collections `libraryTitles`, `libraryCopies`,
 `libraryLoans`, `userCards`); utlåningen går via `/api/library/*`.
 

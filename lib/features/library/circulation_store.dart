@@ -262,7 +262,7 @@ class CirculationStore {
             EventKind.error,
             isbn.isNotEmpty ? 'Boken finns inte i biblioteket' : 'Okänd kod',
             isbn.isNotEmpty
-                ? 'ISBN $isbn är inte inlagt. Lägg till boken i Skolpunkten under Bibliotek → Böcker.'
+                ? 'ISBN $isbn är inte inlagt. Bibliotekarien kan lägga in boken under Böcker genom att skanna streckkoden.'
                 : 'Koden ${result.code} är inte kopplad till någon bok eller något passerkort. Koppla den under Böcker eller Kort/Blipp.',
           );
       }

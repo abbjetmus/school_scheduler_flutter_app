@@ -300,3 +300,71 @@ String normalizeLibraryCode(String value) {
   final s = value.trim().toUpperCase().replaceAll(RegExp(r'[\s:\-]'), '');
   return s.length > 64 ? s.substring(0, 64) : s;
 }
+
+/// Bokuppgifter från /api/library/isbn/{isbn} (Libris, Open Library, Google Books).
+class IsbnLookup {
+  const IsbnLookup({
+    required this.isbn,
+    required this.title,
+    this.author = '',
+    this.edition = '',
+    this.publisher = '',
+    this.coverUrl = '',
+    this.source = '',
+  });
+
+  final String isbn;
+  final String title;
+  final String author;
+  final String edition;
+  final String publisher;
+  final String coverUrl;
+  final String source;
+
+  factory IsbnLookup.fromJson(Map<String, dynamic> json) => IsbnLookup(
+        isbn: _s(json['isbn']),
+        title: _s(json['title']),
+        author: _s(json['author']),
+        edition: _s(json['edition']),
+        publisher: _s(json['publisher']),
+        coverUrl: _s(json['coverUrl']),
+        source: _s(json['source']),
+      );
+}
+
+/// ISBN-10 eller ISBN-13 → ISBN-13 utan bindestreck, annars ''. Samma som
+/// normalizeIsbn i PocketBase.
+String normalizeLibraryIsbn(String value) {
+  final raw = value.toUpperCase().replaceAll(RegExp(r'[^0-9X]'), '');
+  if (RegExp(r'^\d{13}$').hasMatch(raw)) return raw;
+  if (RegExp(r'^\d{9}[\dX]$').hasMatch(raw)) {
+    final core = '978${raw.substring(0, 9)}';
+    var sum = 0;
+    for (var i = 0; i < 12; i++) {
+      sum += int.parse(core[i]) * (i.isEven ? 1 : 3);
+    }
+    return '$core${(10 - sum % 10) % 10}';
+  }
+  return '';
+}
+
+/// Är koden ett riktigt ISBN (rätt kontrollsiffra)? Samma som isValidIsbn i
+/// PocketBase — kortnummer med tio siffror ska inte tas för böcker.
+bool isValidLibraryIsbn(String value) {
+  final raw = value.toUpperCase().replaceAll(RegExp(r'[^0-9X]'), '');
+  if (RegExp(r'^97[89]\d{10}$').hasMatch(raw)) {
+    var sum = 0;
+    for (var i = 0; i < 12; i++) {
+      sum += int.parse(raw[i]) * (i.isEven ? 1 : 3);
+    }
+    return (10 - sum % 10) % 10 == int.parse(raw[12]);
+  }
+  if (RegExp(r'^\d{9}[\dX]$').hasMatch(raw)) {
+    var sum = 0;
+    for (var i = 0; i < 10; i++) {
+      sum += (raw[i] == 'X' ? 10 : int.parse(raw[i])) * (10 - i);
+    }
+    return sum % 11 == 0;
+  }
+  return false;
+}
