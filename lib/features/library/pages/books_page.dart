@@ -84,9 +84,11 @@ class BooksPage extends CompositionWidget {
       }
     }
 
-    Future<void> select(LibraryTitle title) async {
+    /// Visar boken. [keepTarget] låter ett exemplar som väntar på etikett
+    /// vänta kvar medan listan läses om.
+    Future<void> select(LibraryTitle title, {bool keepTarget = false}) async {
       selected.value = title;
-      target.value = null;
+      if (!keepTarget) target.value = null;
       copiesLoading.value = true;
       try {
         copies.value = await api.copies(title: title.id);
@@ -122,18 +124,21 @@ class BooksPage extends CompositionWidget {
 
     Future<void> onCode(String code) async {
       if (dialogOpen) return;
+      // Ett ISBN är bokens streckkod, inte en etikett — skannas en ny bok
+      // medan ett exemplar väntar på etikett hanteras den som en bok.
+      if (target.value != null && isValidLibraryIsbn(code)) target.value = null;
       final t = target.value;
       final title = selected.value;
-      _TagTarget? next;
       try {
         if (t is _TagCopy) {
           await api.setCopyRfid(t.copy.id, code);
           hub.playSuccess();
-          next = t.next;
+          final next = t.next;
           toast(next != null
               ? 'Etiketten är kopplad. Lägg nästa exemplar på läsaren.'
               : 'Etiketten är kopplad till exemplaret${t.copy.location.isNotEmpty ? ' på ${t.copy.location}' : ''}.');
-          target.value = null;
+          // Nästa exemplar väntar direkt, så att det går att blippa i snabb takt.
+          target.value = next;
         } else if (t is _NewCopy && title != null) {
           final location = copies.value.where((c) => c.location.isNotEmpty).firstOrNull?.location ?? '';
           await api.addCopy(title.id, location: location, rfid: code);
@@ -155,7 +160,8 @@ class BooksPage extends CompositionWidget {
               return;
             case ScannedUnknown(:final isbn) when isbn.isNotEmpty:
               hub.playCard();
-              await addBook(isbn: isbn);
+              // Väntar inte på dialogen — den tar själv hand om det som skannas.
+              unawaited(addBook(isbn: isbn));
               return;
             case ScannedUnknown():
               hub.playError();
@@ -164,8 +170,7 @@ class BooksPage extends CompositionWidget {
               return;
           }
         }
-        if (title != null) await select(title);
-        if (next != null) target.value = next;
+        if (title != null) await select(title, keepTarget: true);
         unawaited(loadTitles());
       } on LibraryException catch (e) {
         hub.playError();
@@ -176,7 +181,10 @@ class BooksPage extends CompositionWidget {
     StreamSubscription<String>? sub;
     onMounted(() {
       loadTitles();
-      sub = hub.codes.listen(onCode);
+      // En kod i taget, i ordning — annars kan nästa blipp komma innan
+      // föregående är sparad.
+      var queue = Future<void>.value();
+      sub = hub.codes.listen((code) => queue = queue.then((_) => onCode(code)));
     });
     onUnmounted(() => sub?.cancel());
 

@@ -120,7 +120,6 @@ class _AddBookDialog extends CompositionWidget {
         return;
       }
       duplicate.value ??= findDuplicate(isbn);
-      print('DBG save start');
       saving.value = true;
       saveError.value = null;
       try {
@@ -138,13 +137,9 @@ class _AddBookDialog extends CompositionWidget {
         for (var i = 0; i < copies.value; i++) {
           created.add(await api.addCopy(title.id, location: locationController.text.trim()));
         }
-        print('DBG saved ${title.id} ${created.length} mounted=${context.mounted}');
         if (context.mounted) Navigator.of(context).pop<AddedBook>((title: title, copies: created));
       } on LibraryException catch (e) {
-        print('DBG liberror ${e.message}');
         saveError.value = e.message;
-      } catch (e) {
-        print('DBG error $e');
       } finally {
         saving.value = false;
       }
