@@ -52,16 +52,35 @@ class PcscReaderService {
     }
   }
 
+  /// Släpper en kontext som inte längre gäller. Windows startar om
+  /// Smart Card-tjänsten när en läsare sätts i eller tas ur, och en kontext
+  /// från före omstarten ger då bara SCARD_E_SERVICE_STOPPED/NO_SERVICE.
+  void _resetContext() {
+    final old = _context;
+    _context = null;
+    if (old != null) unawaited(old.release().catchError((_) {}));
+  }
+
+  /// Fel som betyder att kontexten är död (konstanterna exporteras inte av dart_pcsc).
+  static bool _isStaleContext(CardException e) => const {
+        0x80100003, // SCARD_E_INVALID_HANDLE
+        0x8010001D, // SCARD_E_NO_SERVICE
+        0x8010001E, // SCARD_E_SERVICE_STOPPED
+      }.contains(e.errorCode);
+
   /// Anslutna läsare. Tom lista om PC/SC saknas eller ingen läsare sitter i.
   Future<List<String>> listReaders() async {
-    if (!await _ensureContext()) return [];
-    try {
-      return await _context!.listReaders();
-    } catch (e) {
-      // "No readers available" kastas som fel.
-      debugPrint('PC/SC: inga läsare: $e');
-      return [];
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (!await _ensureContext()) return [];
+      try {
+        // dart_pcsc ger tom lista för SCARD_E_NO_READERS_AVAILABLE.
+        return await _context!.listReaders();
+      } catch (e) {
+        debugPrint('PC/SC: kunde inte lista läsare (försök ${attempt + 1}): $e');
+        _resetContext();
+      }
     }
+    return [];
   }
 
   /// Börjar lyssna på en läsare. Byter läsare om en annan redan används.
@@ -80,7 +99,11 @@ class PcscReaderService {
   Future<void> _pollLoop(String readerName, int generation) async {
     var present = false;
     var read = false;
-    while (_polling && generation == _generation && _context != null) {
+    while (_polling && generation == _generation) {
+      if (!await _ensureContext()) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        continue;
+      }
       try {
         final card = await _context!.connect(readerName, ShareMode.shared, Protocol.any);
         if (!present) {
@@ -90,8 +113,10 @@ class PcscReaderService {
         if (!read) read = await _readUid(card);
         await card.disconnect(Disposition.leaveCard);
         await Future<void>.delayed(const Duration(milliseconds: 250));
-      } catch (_) {
-        // Inget på läsaren.
+      } catch (e) {
+        // Oftast bara att inget ligger på läsaren. Har tjänsten startats om
+        // (läsaren urdragen/isatt) måste kontexten göras om.
+        if (e is CardException && _isStaleContext(e)) _resetContext();
         present = false;
         read = false;
         await Future<void>.delayed(const Duration(milliseconds: 350));

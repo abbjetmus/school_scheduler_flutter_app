@@ -63,6 +63,10 @@ i tangentbordsläge fungerar på samma sätt), eller låna i webben.
 
 ## Kioskläge — så att elever inte kan gå ur appen
 
+> Steg för steg för att ställa i ordning en obemannad lånedator, med konto,
+> Shell Launcher, automatisk inloggning, ström och låsning:
+> [docs/KIOSKDATOR.md](docs/KIOSKDATOR.md).
+
 Under **Inställningar → Kioskläge**: välj en PIN-kod, slå på *Starta i
 kioskläge* och tryck *Lås datorn nu*. Då gäller följande:
 
